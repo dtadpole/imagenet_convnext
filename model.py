@@ -3,6 +3,19 @@ from torch import nn
 from torchvision.ops import Permute
 from timm.models.layers import trunc_normal_, DropPath
 
+class GRN(nn.Module):
+    """ GRN (Global Response Normalization) layer
+    """
+    def __init__(self, dim):
+        super().__init__()
+        self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim))
+        self.beta = nn.Parameter(torch.zeros(1, 1, 1, dim))
+
+    def forward(self, x):
+        Gx = torch.norm(x, p=2, dim=(1,2), keepdim=True)
+        Nx = Gx / (Gx.mean(dim=-1, keepdim=True) + 1e-6)
+        return self.gamma * (x * Nx) + self.beta + x
+
 
 class Block(nn.Module):
     r""" ConvNeXt Block. There are two equivalent implementations:
@@ -16,7 +29,7 @@ class Block(nn.Module):
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
     """
 
-    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6):
+    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, use_grn=0):
         super().__init__()
         self.dwconv = nn.Conv2d(dim, dim, kernel_size=7,
                                 padding=3, groups=dim)  # depthwise conv
@@ -26,18 +39,29 @@ class Block(nn.Module):
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * dim, dim)
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim)),
-                                  requires_grad=True) if layer_scale_init_value > 0 else None
+                                  requires_grad=True) if layer_scale_init_value > 0 and use_grn <= 0 else None
         self.drop_path = DropPath(
             drop_path) if drop_path > 0. else nn.Identity()
+        self.use_grn = use_grn
+        self.grn = GRN(dim * 4)
+        self.grn_conv = GRN(dim)
+        self.grn_mlp = GRN(dim)
 
     def forward(self, x):
         input = x
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
+        if self.use_grn == 2:
+            x = self.grn_conv(x)
+        else:
+            x = self.norm(x)
         x = self.pwconv1(x)
         x = self.act(x)
+        if self.use_grn == 1:
+            x = self.grn(x)
         x = self.pwconv2(x)
+        if self.use_grn == 2:
+            x = self.grn_mlp(x)
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
@@ -64,7 +88,7 @@ class ConvNeXt(nn.Module):
     def __init__(self, in_chans=3, num_classes=1000,
                  depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0.,
                  layer_scale_init_value=1e-6, head_init_scale=1.,
-                 ):
+                 use_grn=0):
         super().__init__()
 
         # stem and 3 intermediate downsampling conv layers
@@ -93,7 +117,7 @@ class ConvNeXt(nn.Module):
         for i in range(4):
             stage = nn.Sequential(
                 *[Block(dim=dims[i], drop_path=dp_rates[cur + j],
-                        layer_scale_init_value=layer_scale_init_value) for j in range(depths[i])]
+                        layer_scale_init_value=layer_scale_init_value, use_grn=use_grn) for j in range(depths[i])]
             )
             self.stages.append(stage)
             cur += depths[i]

@@ -33,6 +33,8 @@ parser.add_argument('--transform_ops', default=2, type=int,
                     help='number of ops, default 2')
 parser.add_argument('--transform_mag', default=15, type=int,
                     help="magnitude (default: 15)")
+parser.add_argument('--use_grn', default=0, type=int,
+                    help="use GRN (default: 0; available: 1, 2)")
 args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
