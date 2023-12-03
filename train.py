@@ -1,9 +1,11 @@
 import os
+import math
 import argparse
 import wandb
 import torch
 from torch import optim, nn, utils, Tensor
 from torchvision import datasets, transforms
+from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
 from model import ConvNeXt
@@ -15,10 +17,14 @@ wandb_name = "Tiny-28.6M"
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
-parser.add_argument('--epoch', default=50, type=int,
-                    help="total epoch (default: 50)")
-parser.add_argument('--lr', default=1e-4, type=float,
-                    help="learning rate (default: 1e-4)")
+parser.add_argument('--epoch', default=90, type=int,
+                    help="total epoch (default: 90)")
+parser.add_argument('--warmup-epoch', default=5, type=float,
+                    help='warmup epoch (default: 5)')
+parser.add_argument('--lr', default=3e-4, type=float,
+                    help="learning rate (default: 3e-4)")
+parser.add_argument('--lr_end', default=1e-5, type=float,
+                    help="ending learning rate (default: 1e-5)")
 parser.add_argument('--beta1', default=0.9, type=float,
                     help="beta1 (default: 0.9)")
 parser.add_argument('--beta2', default=0.999, type=float,
@@ -93,6 +99,7 @@ class Model(L.LightningModule):
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
+        self.iters_per_epoch = self._num_training_steps()
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -125,7 +132,32 @@ class Model(L.LightningModule):
     def configure_optimizers(self):
         optimizer = optim.AdamW(
             self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
-        return optimizer
+        main_scheduler = CosineAnnealingLR(
+            optimizer, self.iters_per_epoch*(args.epochs-args.warmup_epoch), eta_min=args.lr_end)
+        warmup_scheduler = LinearLR(optimizer, start_factor=1e-4,
+                                    end_factor=1.0, total_iters=math.ceil(self.iters_per_epoch*args.warmup_epoch))
+        scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, main_scheduler],
+                                milestones=[math.ceil(self.iters_per_epoch*args.warmup_epoch)])
+        return optimizer, scheduler
+
+    def _num_training_steps(self) -> float:
+        """Total training steps inferred from datamodule and devices."""
+        dataset = self.train_dataloader()
+        if self.trainer.max_steps:
+            return self.trainer.max_steps
+
+        dataset_size = (
+            self.trainer.limit_train_batches
+            if self.trainer.limit_train_batches != 0
+            else len(dataset)
+        )
+
+        num_devices = max(1, self.trainer.num_gpus, self.trainer.num_processes)
+        if self.trainer.tpu_cores:
+            num_devices = max(num_devices, self.trainer.tpu_cores)
+
+        effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
+        return (dataset_size / effective_batch_size) * self.trainer.max_epochs
 
 
 model = Model()
