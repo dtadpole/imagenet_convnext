@@ -8,8 +8,8 @@ import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
 from model import ConvNeXt
 
-wandb_project="ConvNeXt"
-wandb_name="Tiny-28.6M"
+wandb_project = "ConvNeXt"
+wandb_name = "Tiny-28.6M"
 
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -41,7 +41,8 @@ torch.set_float32_matmul_precision('medium')
 train_dataset = datasets.ImageFolder(
     os.path.join(args.folder, 'train'),
     transforms.Compose([
-        transforms.RandAugment(num_ops=args.transform_ops, magnitude=args.transform_mag),
+        transforms.RandAugment(num_ops=args.transform_ops,
+                               magnitude=args.transform_mag),
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
@@ -60,6 +61,7 @@ train_loader = utils.data.DataLoader(
 val_loader = utils.data.DataLoader(
     val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=5, pin_memory=True)
 
+
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
@@ -75,6 +77,7 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+
 
 class Model(L.LightningModule):
 
@@ -114,9 +117,9 @@ class Model(L.LightningModule):
         return loss, acc1, acc5
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = optim.AdamW(
+            self.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         return optimizer
-
 
 
 model = Model()
@@ -125,7 +128,7 @@ if args.compile:
 
 
 checkpoint_callback = ModelCheckpoint(
-    save_top_k=3, monitor="val_acc1", filename="model-{epoch:02d}-{val_acc1:.2f}")
+    save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}")
 
 trainer = L.Trainer(limit_train_batches=None, max_epochs=args.epoch, profiler="simple",
                     precision=args.precision, callbacks=[DeviceStatsMonitor(), checkpoint_callback])
