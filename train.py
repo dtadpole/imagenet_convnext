@@ -99,7 +99,6 @@ class Model(L.LightningModule):
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
-        self.iters_per_epoch = None
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -137,20 +136,19 @@ class Model(L.LightningModule):
         return loss, acc1, acc5
 
     def configure_optimizers(self):
-        if self.iters_per_epoch is None:
-            self.iters_per_epoch = self._num_training_steps()
-            print('iters_per_epoch', self.iters_per_epoch)
+        iters_per_epoch = self._num_iters_per_epoch()
+        print('iters_per_epoch', iters_per_epoch)
         optimizer = optim.AdamW(
             self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
         main_scheduler = CosineAnnealingLR(
-            optimizer, self.iters_per_epoch*(args.epoch-args.warmup_epoch), eta_min=args.lr_end)
+            optimizer, iters_per_epoch*(args.epoch-args.warmup_epoch), eta_min=args.lr_end)
         warmup_scheduler = LinearLR(optimizer, start_factor=1e-4,
-                                    end_factor=1.0, total_iters=math.ceil(self.iters_per_epoch*args.warmup_epoch))
+                                    end_factor=1.0, total_iters=math.ceil(iters_per_epoch*args.warmup_epoch))
         scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, main_scheduler],
-                                milestones=[math.ceil(self.iters_per_epoch*args.warmup_epoch)])
+                                milestones=[math.ceil(iters_per_epoch*args.warmup_epoch)])
         return [optimizer], [scheduler]
 
-    def _num_training_steps(self) -> float:
+    def _num_iters_per_epoch(self) -> float:
         """Total training steps inferred from datamodule and devices."""
         dataset_size = len(train_loader)
         devices = max(1, self.trainer.num_devices)
