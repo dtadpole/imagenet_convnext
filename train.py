@@ -6,7 +6,6 @@ from torch import optim, nn, utils, Tensor
 from torchvision import datasets, transforms
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
-# from lightning.pytorch.loggers import WandbLogger
 from model import ConvNeXt
 
 wandb_project="ConvNeXt"
