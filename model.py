@@ -15,6 +15,7 @@ class GRN(nn.Module):
         Gx = torch.norm(x, p=2, dim=(1,2), keepdim=True)
         Nx = Gx / (Gx.mean(dim=-1, keepdim=True) + 1e-6)
         return self.gamma * (x * Nx) + self.beta + x
+        # return x * Nx
 
 
 class Block(nn.Module):
@@ -39,29 +40,29 @@ class Block(nn.Module):
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * dim, dim)
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim)),
-                                  requires_grad=True) if layer_scale_init_value > 0 and use_grn <= 0 else None
+                                  requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(
             drop_path) if drop_path > 0. else nn.Identity()
-        self.use_grn = use_grn
-        self.grn = GRN(dim * 4)
-        self.grn_conv = GRN(dim)
-        self.grn_mlp = GRN(dim)
+        # self.use_grn = use_grn
+        # self.grn = GRN(dim * 4)
+        # self.grn_conv = GRN(dim)
+        # self.grn_mlp = GRN(dim)
 
     def forward(self, x):
         input = x
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        if self.use_grn == 2:
-            x = self.grn_conv(x)
-        else:
-            x = self.norm(x)
+        # if self.use_grn == 2:
+        #     x = self.grn_conv(x)
+        # else:
+        x = self.norm(x)
         x = self.pwconv1(x)
         x = self.act(x)
-        if self.use_grn == 1:
-            x = self.grn(x)
+        # if self.use_grn == 1:
+        #     x = self.grn(x)
         x = self.pwconv2(x)
-        if self.use_grn == 2:
-            x = self.grn_mlp(x)
+        # if self.use_grn == 2:
+        #     x = self.grn_mlp(x)
         if self.gamma is not None:
             x = self.gamma * x
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
