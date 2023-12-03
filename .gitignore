@@ -163,3 +163,4 @@ imagenet
 imagenet/train
 imagenet/val
 lightning_logs/
+wandb/
