@@ -99,7 +99,7 @@ class Model(L.LightningModule):
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
-        self.iters_per_epoch = -1
+        self.iters_per_epoch = None
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -107,17 +107,18 @@ class Model(L.LightningModule):
         output = self._model(images)
         loss = self._loss(output, target)
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        optimizer = self.optimizers()
-        lr = optimizer.param_groups[0]['lr']
+        # optimizer = self.optimizers()
+        # lr = optimizer.param_groups[0]['lr']
+        # step lr scheduler
+        sch = self.lr_schedulers()
+        lr = sch.get_last_lr()[0]
+        sch.step()
         self.log_dict({
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
         })
-        # step lr scheduler
-        sch = self.lr_schedulers()
-        sch.step()
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -136,8 +137,9 @@ class Model(L.LightningModule):
         return loss, acc1, acc5
 
     def configure_optimizers(self):
-        if self.iters_per_epoch < 0:
+        if self.iters_per_epoch is None:
             self.iters_per_epoch = self._num_training_steps()
+            print('iters_per_epoch', self.iters_per_epoch)
         optimizer = optim.AdamW(
             self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
         main_scheduler = CosineAnnealingLR(
@@ -150,22 +152,9 @@ class Model(L.LightningModule):
 
     def _num_training_steps(self) -> float:
         """Total training steps inferred from datamodule and devices."""
-        dataset = train_loader
-        if self.trainer.max_steps:
-            return self.trainer.max_steps
-
-        dataset_size = (
-            self.trainer.limit_train_batches
-            if self.trainer.limit_train_batches != 0
-            else len(dataset)
-        )
-
-        num_devices = max(1, self.trainer.num_gpus, self.trainer.num_processes)
-        if self.trainer.tpu_cores:
-            num_devices = max(num_devices, self.trainer.tpu_cores)
-
-        effective_batch_size = dataset.batch_size * self.trainer.accumulate_grad_batches * num_devices
-        return (dataset_size / effective_batch_size) * self.trainer.max_epochs
+        dataset_size = len(train_loader)
+        devices = max(1, self.trainer.num_devices)
+        return dataset_size / devices
 
 
 model = Model()
