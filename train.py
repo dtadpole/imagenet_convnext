@@ -84,9 +84,6 @@ class Model(L.LightningModule):
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
-        # for key in vars(args):
-        #     wandb.config[key] = getattr(args, key)
-        # wandb.config.update()
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -129,19 +126,6 @@ if args.compile:
 
 checkpoint_callback = ModelCheckpoint(
     save_top_k=3, monitor="val_acc1", filename="model-{epoch:02d}-{val_acc1:.2f}")
-
-# wandb.init(project=wandb_project, name=wandb_name, config=args)
-#
-# def wandb_callback():
-#     wandb.log({
-#         "epoch": epoch,
-#         "train_loss": train_loss,
-#         "train_acc1": train_acc1,
-#         "train_acc5": train_acc5,
-#         "val_loss": val_loss,
-#         "val_acc1": val_acc1,
-#         "val_acc5": val_acc5,
-#     })
 
 trainer = L.Trainer(limit_train_batches=None, max_epochs=args.epoch, profiler="simple",
                     precision=args.precision, callbacks=[DeviceStatsMonitor(), checkpoint_callback])
