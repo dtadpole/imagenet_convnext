@@ -112,6 +112,9 @@ class Model(L.LightningModule):
             "train_acc1": acc1,
             "train_acc5": acc5,
         })
+        # step lr scheduler
+        sch = self.lr_schedulers()
+        sch.step()
         return loss
 
     def validation_step(self, batch, batch_idx):
