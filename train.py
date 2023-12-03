@@ -99,7 +99,7 @@ class Model(L.LightningModule):
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
-        self.iters_per_epoch = self._num_training_steps()
+        self.iters_per_epoch = -1
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -107,10 +107,13 @@ class Model(L.LightningModule):
         output = self._model(images)
         loss = self._loss(output, target)
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        optimizer = self.optimizers()
+        lr = optimizer.param_groups[0]['lr']
         self.log_dict({
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
+            "train_lr": lr,
         })
         return loss
 
@@ -130,19 +133,21 @@ class Model(L.LightningModule):
         return loss, acc1, acc5
 
     def configure_optimizers(self):
+        if self.iters_per_epoch < 0:
+            self.iters_per_epoch = self._num_training_steps()
         optimizer = optim.AdamW(
             self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
         main_scheduler = CosineAnnealingLR(
-            optimizer, self.iters_per_epoch*(args.epochs-args.warmup_epoch), eta_min=args.lr_end)
+            optimizer, self.iters_per_epoch*(args.epoch-args.warmup_epoch), eta_min=args.lr_end)
         warmup_scheduler = LinearLR(optimizer, start_factor=1e-4,
                                     end_factor=1.0, total_iters=math.ceil(self.iters_per_epoch*args.warmup_epoch))
         scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, main_scheduler],
                                 milestones=[math.ceil(self.iters_per_epoch*args.warmup_epoch)])
-        return optimizer, scheduler
+        return [optimizer], [scheduler]
 
     def _num_training_steps(self) -> float:
         """Total training steps inferred from datamodule and devices."""
-        dataset = self.train_dataloader()
+        dataset = train_loader
         if self.trainer.max_steps:
             return self.trainer.max_steps
 
