@@ -19,8 +19,12 @@ parser.add_argument('--epoch', default=50, type=int,
                     help="total epoch (default: 50)")
 parser.add_argument('--lr', default=1e-4, type=float,
                     help="learning rate (default: 1e-4)")
-parser.add_argument('--weight_decay', default=0.05, type=float,
-                    help='weight decay (default: 0.05)')
+parser.add_argument('--beta1', default=0.9, type=float,
+                    help="beta1 (default: 0.9)")
+parser.add_argument('--beta2', default=0.99, type=float,
+                    help="beta2 (default: 0.99)")
+parser.add_argument('--weight_decay', default=0.1, type=float,
+                    help='weight decay (default: 0.1)')
 parser.add_argument('--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
 parser.add_argument('--compile', default=False, type=bool,
@@ -120,7 +124,7 @@ class Model(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(
-            self.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=args.weight_decay)
+            self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
         return optimizer
 
 
