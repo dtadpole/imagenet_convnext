@@ -17,10 +17,12 @@ wandb_name = "Tiny-28.6M"
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
-parser.add_argument('--epoch', default=90, type=int,
-                    help="total epoch (default: 90)")
-parser.add_argument('--warmup-epoch', default=5, type=float,
+parser.add_argument('--epoch', default=75, type=int,
+                    help="total epoch (default: 75)")
+parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
+parser.add_argument('--finetune_epoch', default=10, type=float,
+                    help='finetune epoch (default: 10)')
 parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=1e-5, type=float,
@@ -140,12 +142,25 @@ class Model(L.LightningModule):
         print('iters_per_epoch', iters_per_epoch)
         optimizer = optim.AdamW(
             self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
-        main_scheduler = CosineAnnealingLR(
-            optimizer, iters_per_epoch*(args.epoch-args.warmup_epoch), eta_min=args.lr_end)
-        warmup_scheduler = LinearLR(optimizer, start_factor=1e-4,
-                                    end_factor=1.0, total_iters=math.ceil(iters_per_epoch*args.warmup_epoch))
-        scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, main_scheduler],
-                                milestones=[math.ceil(iters_per_epoch*args.warmup_epoch)])
+        warmup_scheduler = LinearLR(optimizer,
+                                    start_factor=1e-4,
+                                    end_factor=1.0,
+                                    total_iters=math.ceil(iters_per_epoch*args.warmup_epoch))
+        main_scheduler = CosineAnnealingLR(optimizer,
+                                           iters_per_epoch*(args.epoch-args.warmup_epoch-args.finetune_epoch),
+                                           eta_min=args.lr_end)
+        finetune_scheduler = LinearLR(optimizer,
+                                      start_factor=args.lr_end/args.lr,
+                                      end_factor=args.lr_end/args.lr,
+                                      total_iters=math.ceil(iters_per_epoch*args.finetune_epoch))
+        scheduler = SequentialLR(optimizer,
+                                 schedulers=[
+                                     warmup_scheduler,
+                                     main_scheduler,
+                                     finetune_scheduler],
+                                 milestones=[
+                                     math.ceil(iters_per_epoch*args.warmup_epoch),
+                                     math.ceil(iters_per_epoch*(args.epoch-args.finetune_epoch))])
         return [optimizer], [scheduler]
 
     def _num_iters_per_epoch(self) -> float:
