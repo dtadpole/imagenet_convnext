@@ -17,8 +17,8 @@ wandb_project = "ImageNet"
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
-parser.add_argument('-a', '--arch', default='ConvNeXt-T',
-                    help='model arch (default: ConvNeXt-T)')
+parser.add_argument('-a', '--arch', default='ConvNeXt_T',
+                    help='model arch (default: ConvNeXt_T)')
 parser.add_argument('--epoch', default=75, type=int,
                     help="total epoch (default: 75)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
@@ -55,24 +55,24 @@ args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
 
-def build_model(arch="ConvNeXt-T"):
-    if arch == "ConvNeXt-T":
+def build_model(arch="ConvNeXt_T"):
+    if arch.lower() == "ConvNeXt_T".lower():
         return convnext_tiny()
-    elif arch == "ConvNeXt-S":
+    elif arch == "ConvNeXt_S".lower():
         return convnext_small()
-    elif arch == "ConvNeXt-B":
+    elif arch.lower() == "ConvNeXt_B".lower():
         return convnext_base()
-    elif arch == "ConvNeXt-L":
+    elif arch.lower() == "ConvNeXt_L".lower():
         return convnext_large()
-    elif arch == "ConvNeXt-XL":
+    elif arch.lower() == "ConvNeXt_XL".lower():
         return convnext_xlarge()
-    elif arch == "MaxViT-T":
+    elif arch.lower() == "MaxViT_T".lower():
         return max_vit_tiny_224()
-    elif arch == "MaxViT-S":
+    elif arch.lower() == "MaxViT_S".lower():
         return max_vit_small_224()
-    elif arch == "MaxViT-B":
+    elif arch.lower() == "MaxViT_B".lower():
         return max_vit_base_224()
-    elif arch == "MaxViT-L":
+    elif arch.lower() == "MaxViT_L".lower():
         return max_vit_large_224()
     else:
         raise Exception('Unknown arch %s' % arch)
