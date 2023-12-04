@@ -161,7 +161,10 @@ class Model(L.LightningModule):
         self.log_dict(log_dict)
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
-                wandb.init(project=wandb_project, name=args.arch, config=args)
+                model_name = type(self._model).__name__
+                param_count = sum(p.numel() for p in self._model.parameters())
+                wandb_name = model_name + '-' + f"{param_count:_}"
+                wandb.init(project=wandb_project, name=wandb_name, config=args)
                 self.wandb_inited = True
             wandb.log(log_dict)
         return loss, acc1, acc5
