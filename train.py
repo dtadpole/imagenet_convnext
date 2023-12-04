@@ -125,7 +125,7 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
-        wandb.init(project=wandb_project, name=args.arch, config=args)
+        self.wandb_inited = False
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -159,7 +159,11 @@ class Model(L.LightningModule):
             "val_acc5": acc5,
         }
         self.log_dict(log_dict)
-        wandb.log(log_dict)
+        if self.trainer.local_rank == 0:
+            if not self.wandb_inited:
+                wandb.init(project=wandb_project, name=args.arch, config=args)
+                self.wandb_inited = True
+            wandb.log(log_dict)
         return loss, acc1, acc5
 
     def configure_optimizers(self):
