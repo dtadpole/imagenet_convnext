@@ -175,6 +175,10 @@ def convnext_small(pretrained=False,in_22k=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
+def convnext_small_2(pretrained=False,in_22k=False, **kwargs):
+    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[128, 256, 512, 1024], **kwargs)
+    return model
+
 def convnext_base(pretrained=False, in_22k=False, **kwargs):
     model = ConvNeXt(depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], **kwargs)
     if pretrained:
