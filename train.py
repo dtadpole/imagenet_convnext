@@ -19,6 +19,8 @@ parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
 parser.add_argument('-a', '--arch', default='ConvNeXt_T',
                     help='model arch (default: ConvNeXt_T)')
+parser.add_argument('-b', '--batch_size', default=64, type=int,
+                    help="batch size (default: 64)")
 parser.add_argument('--epoch', default=75, type=int,
                     help="total epoch (default: 75)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
@@ -35,8 +37,6 @@ parser.add_argument('--beta2', default=0.999, type=float,
                     help="beta2 (default: 0.999)")
 parser.add_argument('--weight_decay', default=0.1, type=float,
                     help='weight decay (default: 0.1)')
-parser.add_argument('--batch_size', default=64, type=int,
-                    help="batch size (default: 64)")
 parser.add_argument('--compile', default=False, type=bool,
                     help="compile model (default: False)")
 parser.add_argument('--workers', default=5, type=int,
