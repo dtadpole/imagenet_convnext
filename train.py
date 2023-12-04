@@ -8,7 +8,7 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
-from convnext import convnext_tiny, convnext_small, convnext_base, convnext_large, convnext_xlarge
+from convnext import convnext_tiny, convnext_small, convnext_small_2, convnext_base, convnext_large, convnext_xlarge
 from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
 from maxvit import MaxViT
 
@@ -60,6 +60,8 @@ def build_model(arch="ConvNeXt_T"):
         return convnext_tiny()
     elif arch == "ConvNeXt_S".lower():
         return convnext_small()
+    elif arch == "ConvNeXt_S2".lower():
+        return convnext_small_2()
     elif arch.lower() == "ConvNeXt_B".lower():
         return convnext_base()
     elif arch.lower() == "ConvNeXt_L".lower():
