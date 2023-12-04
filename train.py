@@ -8,15 +8,16 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
-from model import ConvNeXt
-
-wandb_project = "ConvNeXt"
-wandb_name = "Tiny-28.6M"
+from convnext import convnext_tiny, convnext_small, convnext_base, convnext_large, convnext_xlarge
+from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
+from maxvit import MaxViT
 
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
+parser.add_argument('-a', '--arch', default='ConvNeXt-T',
+                    help='model arch (default: ConvNeXt-T)')
 parser.add_argument('--epoch', default=75, type=int,
                     help="total epoch (default: 75)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
@@ -51,6 +52,30 @@ args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
 
+wandb_project = "ImageNet"
+wandb_name = args.arch
+
+def build_model(arch="ConvNeXt-T"):
+    if arch == "ConvNeXt-T":
+        return convnext_tiny()
+    elif arch == "ConvNeXt-S":
+        return convnext_small()
+    elif arch == "ConvNeXt-B":
+        return convnext_base()
+    elif arch == "ConvNeXt-L":
+        return convnext_large()
+    elif arch == "ConvNeXt-XL":
+        return convnext_xlarge()
+    elif arch == "MaxViT-T":
+        return max_vit_tiny_224()
+    elif arch == "MaxViT-S":
+        return max_vit_small_224()
+    elif arch == "MaxViT-B":
+        return max_vit_base_224()
+    elif arch == "MaxViT-L":
+        return max_vit_large_224()
+    else:
+        raise Exception('Unknown arch %s' % arch)
 
 train_dataset = datasets.ImageFolder(
     os.path.join(args.folder, 'train'),
@@ -97,7 +122,7 @@ class Model(L.LightningModule):
 
     def __init__(self):
         super().__init__()
-        self._model = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768])
+        self._model = build_model(args.arch)
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         wandb.init(project=wandb_project, name=wandb_name, config=args)
