@@ -12,6 +12,7 @@ from convnext import convnext_tiny, convnext_small, convnext_base, convnext_larg
 from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
 from maxvit import MaxViT
 
+wandb_project = "ImageNet"
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
@@ -53,9 +54,6 @@ parser.add_argument('--use_grn', default=0, type=int,
 args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
-
-wandb_project = "ImageNet"
-wandb_name = args.arch
 
 def build_model(arch="ConvNeXt-T"):
     if arch == "ConvNeXt-T":
@@ -127,7 +125,7 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
-        wandb.init(project=wandb_project, name=wandb_name, config=args)
+        wandb.init(project=wandb_project, name=args.arch, config=args)
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
