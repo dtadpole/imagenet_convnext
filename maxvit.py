@@ -713,7 +713,7 @@ def max_vit_small_224(**kwargs) -> MaxViT:
     """ MaxViT small for a resolution of 224 X 224"""
     return MaxViT(
         depths=(2, 2, 5, 2),
-        channels=(96, 128, 256, 512),
+        channels=(96, 192, 384, 768),
         embed_dim=64,
         **kwargs
     )
