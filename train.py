@@ -21,8 +21,8 @@ parser.add_argument('-a', '--arch', default='ConvNeXt_T',
                     help='model arch (default: ConvNeXt_T)')
 parser.add_argument('-b', '--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
-parser.add_argument('--epoch', default=75, type=int,
-                    help="total epoch (default: 75)")
+parser.add_argument('--epoch', default=60, type=int,
+                    help="total epoch (default: 60)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
 parser.add_argument('--finetune_epoch', default=10, type=float,
@@ -55,6 +55,7 @@ args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
 
+
 def build_model(arch="ConvNeXt_T"):
     if arch.lower() == "ConvNeXt_T".lower():
         return convnext_tiny()
@@ -78,6 +79,7 @@ def build_model(arch="ConvNeXt_T"):
         return max_vit_large_224()
     else:
         raise Exception('Unknown arch %s' % arch)
+
 
 train_dataset = datasets.ImageFolder(
     os.path.join(args.folder, 'train'),
@@ -181,7 +183,9 @@ class Model(L.LightningModule):
                                     end_factor=1.0,
                                     total_iters=math.ceil(iters_per_epoch*args.warmup_epoch))
         main_scheduler = CosineAnnealingLR(optimizer,
-                                           iters_per_epoch*(args.epoch-args.warmup_epoch-args.finetune_epoch),
+                                           iters_per_epoch *
+                                           (args.epoch-args.warmup_epoch -
+                                            args.finetune_epoch),
                                            eta_min=args.lr_end)
         finetune_scheduler = LinearLR(optimizer,
                                       start_factor=args.lr_end/args.lr,
@@ -193,7 +197,8 @@ class Model(L.LightningModule):
                                      main_scheduler,
                                      finetune_scheduler],
                                  milestones=[
-                                     math.ceil(iters_per_epoch*args.warmup_epoch),
+                                     math.ceil(iters_per_epoch *
+                                               args.warmup_epoch),
                                      math.ceil(iters_per_epoch*(args.epoch-args.finetune_epoch))])
         return [optimizer], [scheduler]
 
