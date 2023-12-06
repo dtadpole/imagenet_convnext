@@ -133,6 +133,7 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
+        self.validation_step_outputs = []
         self.wandb_inited = False
 
     def training_step(self, batch, batch_idx):
@@ -164,15 +165,19 @@ class Model(L.LightningModule):
             "val_acc1": acc1,
             "val_acc5": acc5,
         }
-        return log_dict
+        self.validation_step_outputs.append(log_dict)
 
-    def validation_epoch_end(self, batch, outs):
-        # outs is a list of whatever you returned in `validation_step`
+    def on_validation_epoch_end(self):
+        # outs is a list of whatever stored in `validation_step`
+        outs = self.validation_step_outputs
         loss = torch.stack([x['val_loss'] for x in outs]).mean()
         acc1 = torch.stack([x['val_acc1'] for x in outs]).mean()
         acc5 = torch.stack([x['val_acc5'] for x in outs]).mean()
+        self.validation_step_outputs.clear()  # free memory
+        # get lr
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
+        # log results
         log_dict = {
             "val_loss": loss,
             "val_acc1": acc1,
