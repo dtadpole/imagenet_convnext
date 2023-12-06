@@ -141,8 +141,6 @@ class Model(L.LightningModule):
         output = self._model(images)
         loss = self._loss(output, target)
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # optimizer = self.optimizers()
-        # lr = optimizer.param_groups[0]['lr']
         # step lr scheduler
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
@@ -173,10 +171,13 @@ class Model(L.LightningModule):
         loss = torch.stack([x['val_loss'] for x in outs]).mean()
         acc1 = torch.stack([x['val_acc1'] for x in outs]).mean()
         acc5 = torch.stack([x['val_acc5'] for x in outs]).mean()
+        sch = self.lr_schedulers()
+        lr = sch.get_last_lr()[0]
         log_dict = {
             "val_loss": loss,
             "val_acc1": acc1,
             "val_acc5": acc5,
+            "val_lr": lr,
         }
         self.log_dict(log_dict)
         if self.trainer.local_rank == 0:
