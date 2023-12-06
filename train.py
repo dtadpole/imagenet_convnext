@@ -166,6 +166,18 @@ class Model(L.LightningModule):
             "val_acc1": acc1,
             "val_acc5": acc5,
         }
+        return log_dict
+
+    def validation_epoch_end(self, batch, outs):
+        # outs is a list of whatever you returned in `validation_step`
+        loss = torch.stack([x['val_loss'] for x in outs]).mean()
+        acc1 = torch.stack([x['val_acc1'] for x in outs]).mean()
+        acc5 = torch.stack([x['val_acc5'] for x in outs]).mean()
+        log_dict = {
+            "val_loss": loss,
+            "val_acc1": acc1,
+            "val_acc5": acc5,
+        }
         self.log_dict(log_dict)
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
@@ -175,8 +187,7 @@ class Model(L.LightningModule):
                 wandb.init(project=wandb_project, name=wandb_name, config=args)
                 self.wandb_inited = True
             wandb.log(log_dict)
-        return loss, acc1, acc5
-
+        
     def configure_optimizers(self):
         iters_per_epoch = self._num_iters_per_epoch()
         print('iters_per_epoch', iters_per_epoch)
