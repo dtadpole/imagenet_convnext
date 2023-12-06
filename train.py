@@ -184,7 +184,7 @@ class Model(L.LightningModule):
             "val_acc5": acc5,
             "val_lr": lr,
         }
-        self.log_dict(log_dict)
+        self.log_dict(log_dict, sync_dist=True)
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
