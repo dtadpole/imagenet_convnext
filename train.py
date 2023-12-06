@@ -236,7 +236,7 @@ if args.compile:
 
 
 checkpoint_callback = ModelCheckpoint(
-    save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}")
+    save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
 
 trainer = L.Trainer(limit_train_batches=None, max_epochs=args.epoch, profiler="simple",
                     precision=args.precision, callbacks=[DeviceStatsMonitor(), checkpoint_callback])
