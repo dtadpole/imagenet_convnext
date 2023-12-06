@@ -31,6 +31,10 @@ parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=1e-5, type=float,
                     help="ending learning rate (default: 1e-5)")
+parser.add_argument('--drop_rate', default=0.1, type=float,
+                    help="drop rate (default: 0.1)")
+parser.add_argument('--drop_path_rate', default=0.1, type=float,
+                    help="drop path rate (default: 0.1)")
 parser.add_argument('--beta1', default=0.9, type=float,
                     help="beta1 (default: 0.9)")
 parser.add_argument('--beta2', default=0.999, type=float,
@@ -58,25 +62,25 @@ torch.set_float32_matmul_precision('medium')
 
 def build_model(arch="ConvNeXt_T"):
     if arch.lower() == "ConvNeXt_T".lower():
-        return convnext_tiny()
+        return convnext_tiny(drop_path_rate=args.drop_path_rate)
     elif arch == "ConvNeXt_S".lower():
-        return convnext_small()
+        return convnext_small(drop_path_rate=args.drop_path_rate)
     elif arch == "ConvNeXt_S2".lower():
-        return convnext_small_2()
+        return convnext_small_2(drop_path_rate=args.drop_path_rate)
     elif arch.lower() == "ConvNeXt_B".lower():
-        return convnext_base()
+        return convnext_base(drop_path_rate=args.drop_path_rate)
     elif arch.lower() == "ConvNeXt_L".lower():
-        return convnext_large()
+        return convnext_large(drop_path_rate=args.drop_path_rate)
     elif arch.lower() == "ConvNeXt_XL".lower():
-        return convnext_xlarge()
+        return convnext_xlarge(drop_path_rate=args.drop_path_rate)
     elif arch.lower() == "MaxViT_T".lower():
-        return max_vit_tiny_224()
+        return max_vit_tiny_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_S".lower():
-        return max_vit_small_224()
+        return max_vit_small_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_B".lower():
-        return max_vit_base_224()
+        return max_vit_base_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_L".lower():
-        return max_vit_large_224()
+        return max_vit_large_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
     else:
         raise Exception('Unknown arch %s' % arch)
 
