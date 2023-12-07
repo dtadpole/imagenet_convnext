@@ -21,7 +21,7 @@ parser.add_argument('-a', '--arch', default='ConvNeXt_T',
                     help='model arch (default: ConvNeXt_T)')
 parser.add_argument('-b', '--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
-parser.add_argument('--epoch', default=60, type=int,
+parser.add_argument('--epoch', default=50, type=int,
                     help="total epoch (default: 50)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
@@ -193,7 +193,7 @@ class Model(L.LightningModule):
                 wandb.init(project=wandb_project, name=wandb_name, config=args)
                 self.wandb_inited = True
             wandb.log(log_dict)
-        
+
     def configure_optimizers(self):
         iters_per_epoch = self._num_iters_per_epoch()
         print('iters_per_epoch', iters_per_epoch)
