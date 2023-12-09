@@ -33,8 +33,8 @@ parser.add_argument('--lr_end', default=3e-5, type=float,
                     help="ending learning rate (default: 3e-5)")
 parser.add_argument('--drop_rate', default=0.1, type=float,
                     help="drop rate (default: 0.1)")
-parser.add_argument('--drop_path_rate', default=0.1, type=float,
-                    help="drop path rate (default: 0.1)")
+parser.add_argument('--drop_path_rate', default=0.2, type=float,
+                    help="drop path rate (default: 0.2)")
 parser.add_argument('--beta1', default=0.9, type=float,
                     help="beta1 (default: 0.9)")
 parser.add_argument('--beta2', default=0.999, type=float,
