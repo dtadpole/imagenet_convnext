@@ -12,9 +12,12 @@ from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
 from convnext import convnext_tiny, convnext_small, convnext_small_2, convnext_base, convnext_large, convnext_xlarge
 from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
 from maxvit import MaxViT
+from timm.data.mixup import Mixup
+from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 wandb_project = "ImageNet"
 
+# basic params
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-f', '--folder', default='./imagenet/',
                     help='path to dataset (default: ./imagenet/)')
@@ -22,6 +25,8 @@ parser.add_argument('-a', '--arch', default='ConvNeXt_T',
                     help='model arch (default: ConvNeXt_T)')
 parser.add_argument('-b', '--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
+
+# epoch and lr
 parser.add_argument('--epoch', default=50, type=int,
                     help="total epoch (default: 50)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
@@ -32,6 +37,8 @@ parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=3e-5, type=float,
                     help="ending learning rate (default: 3e-5)")
+
+# drop rate
 parser.add_argument('--drop_rate', default=0.1, type=float,
                     help="drop rate (default: 0.1)")
 parser.add_argument('--drop_path_rate', default=0.2, type=float,
@@ -42,20 +49,48 @@ parser.add_argument('--beta2', default=0.999, type=float,
                     help="beta2 (default: 0.999)")
 parser.add_argument('--weight_decay', default=0.1, type=float,
                     help='weight decay (default: 0.1)')
+
+# workers
 parser.add_argument('--compile', default=False, type=bool,
                     help="compile model (default: False)")
+parser.add_argument('--precision', default='bf16-mixed', type=str,
+                    help='training precision (default: bf16-mixed)')
 parser.add_argument('--workers', default=5, type=int,
                     help="number of workers (default: 5)")
 parser.add_argument('--prefetch', default=10, type=int,
                     help="number of prefetch (default: 10)")
-parser.add_argument('--precision', default='bf16-mixed', type=str,
-                    help='training precision (default: bf16-mixed)')
+parser.add_argument('--nb_classes', default=1000, type=int,
+                    help='number of the classification types')
+
+# Augmentation parameters
+parser.add_argument('--color_jitter', type=float, default=0.4, metavar='PCT',
+                    help='Color jitter factor (default: 0.4)')
+parser.add_argument('--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
+                    help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)'),
+parser.add_argument('--smoothing', type=float, default=0.1,
+                    help='Label smoothing (default: 0.1)')
+parser.add_argument('--train_interpolation', type=str, default='bicubic',
+                    help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
+
+# * Mixup params
+parser.add_argument('--mixup', type=float, default=0.8,
+                    help='mixup alpha, mixup enabled if > 0.')
+parser.add_argument('--cutmix', type=float, default=1.0,
+                    help='cutmix alpha, cutmix enabled if > 0.')
+parser.add_argument('--cutmix_minmax', type=float, nargs='+', default=None,
+                    help='cutmix min/max ratio, overrides alpha and enables cutmix if set (default: None)')
+parser.add_argument('--mixup_prob', type=float, default=1.0,
+                    help='Probability of performing mixup or cutmix when either/both is enabled')
+parser.add_argument('--mixup_switch_prob', type=float, default=0.5,
+                    help='Probability of switching to cutmix when both mixup and cutmix enabled')
+parser.add_argument('--mixup_mode', type=str, default='batch',
+                    help='How to apply mixup/cutmix params. Per "batch", "pair", or "elem"')
+
+# transforms
 parser.add_argument('--transform_ops', default=2, type=int,
                     help='number of ops, default 2')
 parser.add_argument('--transform_mag', default=15, type=int,
                     help="magnitude (default: 15)")
-parser.add_argument('--use_grn', default=0, type=int,
-                    help="use GRN (default: 0; available: 1, 2)")
 args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
@@ -85,7 +120,17 @@ def build_model(arch="ConvNeXt_T"):
     else:
         raise Exception('Unknown arch %s' % arch)
 
+# mixup
+mixup_fn = None
+mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
+if mixup_active:
+    print("Mixup is activated!")
+    mixup_fn = Mixup(
+        mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
+        prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
+        label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
+# train dataset
 train_dataset = datasets.ImageFolder(
     os.path.join(args.folder, 'train'),
     transforms.Compose([
@@ -132,7 +177,13 @@ class Model(L.LightningModule):
     def __init__(self):
         super().__init__()
         self._model = build_model(args.arch)
-        self._loss = nn.CrossEntropyLoss()
+        if mixup_fn is not None:
+            # smoothing is handled with mixup label transform
+            self._loss =  SoftTargetCrossEntropy()
+        elif args.smoothing > 0.:
+            self._loss =  LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+        else:
+            self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         self.train_step_outputs = []
         self.validation_step_outputs = []
@@ -140,10 +191,12 @@ class Model(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
-        images, target = batch
+        images, targets = batch
+        if mixup_fn is not None:
+            images, targets = mixup_fn(images, targets)
         output = self._model(images)
-        loss = self._loss(output, target)
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        loss = self._loss(output, targets)
+        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # step lr scheduler
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
@@ -160,10 +213,10 @@ class Model(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         # validation_step defines the validation loop.
-        images, target = batch
+        images, targets = batch
         output = self._model(images)
-        loss = self._loss(output, target)
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        loss = self._loss(output, targets)
+        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
             "val_loss": loss,
             "val_acc1": acc1,
