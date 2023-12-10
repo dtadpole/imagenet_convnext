@@ -4,6 +4,7 @@ import argparse
 import wandb
 import torch
 from torch import optim, nn, utils, Tensor
+from torch.utils.data import DataLoader
 import torch.distributed as dist
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
@@ -57,8 +58,8 @@ parser.add_argument('--precision', default='bf16-mixed', type=str,
                     help='training precision (default: bf16-mixed)')
 parser.add_argument('--workers', default=4, type=int,
                     help="number of workers (default: 4)")
-parser.add_argument('--prefetch', default=4, type=int,
-                    help="number of prefetch (default: 4)")
+parser.add_argument('--prefetch', default=8, type=int,
+                    help="number of prefetch (default: 8)")
 
 # * Mixup params
 parser.add_argument('--mixup', type=float, default=0.8,
@@ -140,9 +141,9 @@ val_dataset = datasets.ImageFolder(
         transforms.ToTensor(),
     ]))
 
-train_loader = utils.data.DataLoader(
+train_loader = DataLoader(
     train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
-val_loader = utils.data.DataLoader(
+val_loader = DataLoader(
     val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
 
 
