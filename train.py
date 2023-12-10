@@ -27,12 +27,12 @@ parser.add_argument('-b', '--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
 
 # epoch and lr
-parser.add_argument('--epoch', default=50, type=int,
-                    help="total epoch (default: 50)")
+parser.add_argument('--epoch', default=60, type=int,
+                    help="total epoch (default: 60)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
-parser.add_argument('--finetune_epoch', default=5, type=float,
-                    help='finetune epoch (default: 5)')
+parser.add_argument('--finetune_epoch', default=10, type=float,
+                    help='finetune epoch (default: 10)')
 parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=3e-5, type=float,
@@ -118,6 +118,7 @@ def build_model(arch="ConvNeXt_T"):
     else:
         raise Exception('Unknown arch %s' % arch)
 
+
 # mixup
 mixup_fn = None
 mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
@@ -176,9 +177,10 @@ class Model(L.LightningModule):
         super().__init__()
         self._model = build_model(args.arch)
         if mixup_fn is not None:
-            self._train_loss_fn =  SoftTargetCrossEntropy()
+            self._train_loss_fn = SoftTargetCrossEntropy()
         elif args.smoothing > 0.:
-            self._train_loss_fn =  LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+            self._train_loss_fn = LabelSmoothingCrossEntropy(
+                smoothing=args.smoothing)
         else:
             self._train_loss_fn = nn.CrossEntropyLoss()
         self._eval_loss_fn = nn.CrossEntropyLoss()
@@ -241,9 +243,12 @@ class Model(L.LightningModule):
         self.validation_step_outputs.clear()  # free val memory
         # train_outs is a list of whatever stored in `train_step`
         train_outs = self.train_step_outputs
-        train_loss = torch.stack([x['train_loss'] for x in train_outs]).mean() if len(train_outs) > 0 else val_loss
-        train_acc1 = torch.stack([x['train_acc1'] for x in train_outs]).mean() if len(train_outs) > 0 else val_acc1
-        train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(train_outs) > 0 else val_acc5
+        train_loss = torch.stack([x['train_loss'] for x in train_outs]).mean() if len(
+            train_outs) > 0 else val_loss
+        train_acc1 = torch.stack([x['train_acc1'] for x in train_outs]).mean() if len(
+            train_outs) > 0 else val_acc1
+        train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(
+            train_outs) > 0 else val_acc5
         self.train_step_outputs.clear()  # free train memory
         # all_gather
         tensorized = torch.Tensor([
@@ -254,7 +259,8 @@ class Model(L.LightningModule):
             val_acc1,
             val_acc5
         ]).cuda()
-        gather_t = [torch.ones_like(tensorized) for _ in range(dist.get_world_size())]
+        gather_t = [torch.ones_like(tensorized)
+                    for _ in range(dist.get_world_size())]
         dist.all_gather(gather_t, tensorized)
         result_t = torch.mean(torch.stack(gather_t), dim=0)
         # get lr
