@@ -228,7 +228,7 @@ class Model(L.LightningModule):
             "val_acc5": acc5,
         }
         self.validation_step_outputs.append(log_dict)
-        self.log_dict(log_dict)
+        self.log_dict(log_dict, sync_dist=True)
 
     def on_validation_epoch_end(self):
         # val_outs is a list of whatever stored in `validation_step`
