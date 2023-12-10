@@ -191,10 +191,17 @@ class Model(L.LightningModule):
         # training_step defines the train loop.
         images, targets = batch
         if mixup_fn is not None:
-            images, targets = mixup_fn(images, targets)
-        output = self._model(images)
-        loss = self._train_loss_fn(output, targets)
-        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+            mixup_images, mixup_targets = mixup_fn(images, targets)
+            mixup_output = self._model(mixup_images)
+            loss = self._train_loss_fn(mixup_output, mixup_targets)
+            with torch.no_grad():
+                output = self._model(images)
+                acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+        else:
+            output = self._model(images)
+            loss = self._train_loss_fn(output, targets)
+            with torch.no_grad():
+                acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # step lr scheduler
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
@@ -237,7 +244,14 @@ class Model(L.LightningModule):
         train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(train_outs) > 0 else val_acc5
         self.train_step_outputs.clear()  # free train memory
         # all_gather
-        tensorized = torch.Tensor([train_loss, train_acc1, train_acc5, val_loss, val_acc1, val_acc5]).cuda()
+        tensorized = torch.Tensor([
+            train_loss,
+            train_acc1,
+            train_acc5,
+            val_loss,
+            val_acc1,
+            val_acc5
+        ]).cuda()
         gather_t = [torch.ones_like(tensorized) for _ in range(dist.get_world_size())]
         dist.all_gather(gather_t, tensorized)
         result_t = torch.mean(torch.stack(gather_t), dim=0)
