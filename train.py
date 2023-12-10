@@ -59,8 +59,6 @@ parser.add_argument('--workers', default=5, type=int,
                     help="number of workers (default: 5)")
 parser.add_argument('--prefetch', default=10, type=int,
                     help="number of prefetch (default: 10)")
-parser.add_argument('--nb_classes', default=1000, type=int,
-                    help='number of the classification types')
 
 # Augmentation parameters
 parser.add_argument('--color_jitter', type=float, default=0.4, metavar='PCT',
@@ -128,7 +126,7 @@ if mixup_active:
     mixup_fn = Mixup(
         mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
         prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-        label_smoothing=args.smoothing, num_classes=args.nb_classes)
+        label_smoothing=args.smoothing)
 
 # train dataset
 train_dataset = datasets.ImageFolder(
@@ -152,7 +150,7 @@ val_dataset = datasets.ImageFolder(
 train_loader = utils.data.DataLoader(
     train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
 val_loader = utils.data.DataLoader(
-    val_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
+    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
 
 
 def accuracy(output, target, topk=(1,)):
