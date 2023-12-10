@@ -171,12 +171,14 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         if mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
+            self._eval_loss_fn = nn.CrossEntropyLoss()
         elif args.smoothing > 0.:
             self._train_loss_fn = LabelSmoothingCrossEntropy(
                 smoothing=args.smoothing)
+            self._eval_loss_fn = nn.CrossEntropyLoss()
         else:
             self._train_loss_fn = nn.CrossEntropyLoss()
-        self._eval_loss_fn = nn.CrossEntropyLoss()
+            self._eval_loss_fn = self._train_loss_fn
         self.save_hyperparameters(args)
         self.train_step_outputs = []
         self.validation_step_outputs = []
