@@ -44,9 +44,9 @@ parser.add_argument('--weight_decay', default=0.1, type=float,
                     help='weight decay (default: 0.1)')
 parser.add_argument('--compile', default=False, type=bool,
                     help="compile model (default: False)")
-parser.add_argument('--workers', default=4, type=int,
+parser.add_argument('--workers', default=5, type=int,
                     help="number of workers (default: 5)")
-parser.add_argument('--prefetch', default=8, type=int,
+parser.add_argument('--prefetch', default=10, type=int,
                     help="number of prefetch (default: 10)")
 parser.add_argument('--precision', default='bf16-mixed', type=str,
                     help='training precision (default: bf16-mixed)')
@@ -198,9 +198,9 @@ class Model(L.LightningModule):
             "train_loss": result_t[0],
             "train_acc1": result_t[1],
             "train_acc5": result_t[2],
-            "validation_loss": result_t[3],
-            "validation_acc1": result_t[4],
-            "validation_acc5": result_t[5],
+            "val_loss": result_t[3],
+            "val_acc1": result_t[4],
+            "val_acc5": result_t[5],
             "train_lr": lr,
         }
         if self.trainer.local_rank == 0:
