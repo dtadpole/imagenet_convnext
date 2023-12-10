@@ -202,15 +202,21 @@ class Model(L.LightningModule):
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
         sch.step()
-        log_dict = {
+        # log
+        self.log_dict({
             "train_loss": loss,
             "train_loss_raw": loss_raw,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
-        }
-        self.train_step_outputs.append(log_dict)
-        self.log_dict(log_dict)
+        })
+        # buffer
+        self.train_step_outputs.append({
+            "train_loss": loss,
+            "train_acc1": acc1,
+            "train_acc5": acc5,
+        })
+        # return
         return loss
 
     def validation_step(self, batch, batch_idx):
