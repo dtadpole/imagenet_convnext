@@ -198,9 +198,9 @@ class Model(L.LightningModule):
             "train_loss": result_t[0],
             "train_acc1": result_t[1],
             "train_acc5": result_t[2],
-            "val_loss": result_t[3],
-            "val_acc1": result_t[4],
-            "val_acc5": result_t[5],
+            "validation_loss": result_t[3],
+            "validation_acc1": result_t[4],
+            "validation_acc5": result_t[5],
             "train_lr": lr,
         }
         if self.trainer.local_rank == 0:
