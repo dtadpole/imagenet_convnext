@@ -151,7 +151,7 @@ val_dataset = datasets.ImageFolder(
 train_loader = utils.data.DataLoader(
     train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
 val_loader = utils.data.DataLoader(
-    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=args.prefetch // 2, pin_memory=True)
+    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers // 2, prefetch_factor=args.prefetch // 2, pin_memory=True)
 
 
 def accuracy(output, target, topk=(1,)):
