@@ -196,18 +196,20 @@ class Model(L.LightningModule):
             loss = self._train_loss_fn(mixup_output, mixup_targets)
             with torch.no_grad():
                 output = self._model(images)
-                acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+                loss_raw = self._eval_loss_fn(output, targets)
         else:
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
-            with torch.no_grad():
-                acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+            loss_raw = loss
+        # accuracy
+        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # step lr scheduler
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
         sch.step()
         log_dict = {
             "train_loss": loss,
+            "train_loss_raw": loss_raw,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
