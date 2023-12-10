@@ -36,8 +36,8 @@ parser.add_argument('--finetune_epoch', default=10, type=float,
                     help='finetune epoch (default: 10)')
 parser.add_argument('--lr', default=6e-4, type=float,
                     help="learning rate (default: 6e-4)")
-parser.add_argument('--lr_end', default=3e-5, type=float,
-                    help="ending learning rate (default: 3e-5)")
+parser.add_argument('--lr_end', default=6e-5, type=float,
+                    help="ending learning rate (default: 6e-5)")
 
 # drop rate
 parser.add_argument('--drop_rate', default=0.1, type=float,
