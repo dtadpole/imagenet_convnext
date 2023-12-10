@@ -55,10 +55,10 @@ parser.add_argument('--compile', default=False, type=bool,
                     help="compile model (default: False)")
 parser.add_argument('--precision', default='bf16-mixed', type=str,
                     help='training precision (default: bf16-mixed)')
-parser.add_argument('--workers', default=5, type=int,
-                    help="number of workers (default: 5)")
-parser.add_argument('--prefetch', default=5, type=int,
-                    help="number of prefetch (default: 5)")
+parser.add_argument('--workers', default=4, type=int,
+                    help="number of workers (default: 4)")
+parser.add_argument('--prefetch', default=4, type=int,
+                    help="number of prefetch (default: 4)")
 
 # * Mixup params
 parser.add_argument('--mixup', type=float, default=0.8,
