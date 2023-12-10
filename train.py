@@ -33,8 +33,8 @@ parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
 parser.add_argument('--finetune_epoch', default=10, type=float,
                     help='finetune epoch (default: 10)')
-parser.add_argument('--lr', default=3e-4, type=float,
-                    help="learning rate (default: 3e-4)")
+parser.add_argument('--lr', default=1e-3, type=float,
+                    help="learning rate (default: 1e-3)")
 parser.add_argument('--lr_end', default=3e-5, type=float,
                     help="ending learning rate (default: 3e-5)")
 
