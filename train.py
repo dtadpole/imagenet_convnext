@@ -179,11 +179,12 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         if mixup_fn is not None:
             # smoothing is handled with mixup label transform
-            self._loss =  SoftTargetCrossEntropy()
+            self._train_loss =  SoftTargetCrossEntropy()
         elif args.smoothing > 0.:
-            self._loss =  LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+            self._train_loss =  LabelSmoothingCrossEntropy(smoothing=args.smoothing)
         else:
-            self._loss = nn.CrossEntropyLoss()
+            self._train_loss = nn.CrossEntropyLoss()
+        self._eval_loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
         self.train_step_outputs = []
         self.validation_step_outputs = []
@@ -195,7 +196,7 @@ class Model(L.LightningModule):
         if mixup_fn is not None:
             images, targets = mixup_fn(images, targets)
         output = self._model(images)
-        loss = self._loss(output, targets)
+        loss = self._train_loss(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # step lr scheduler
         sch = self.lr_schedulers()
@@ -215,7 +216,7 @@ class Model(L.LightningModule):
         # validation_step defines the validation loop.
         images, targets = batch
         output = self._model(images)
-        loss = self._loss(output, targets)
+        loss = self._eval_loss(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
             "val_loss": loss,
