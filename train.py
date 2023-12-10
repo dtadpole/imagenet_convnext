@@ -57,8 +57,8 @@ parser.add_argument('--precision', default='bf16-mixed', type=str,
                     help='training precision (default: bf16-mixed)')
 parser.add_argument('--workers', default=4, type=int,
                     help="number of workers (default: 4)")
-parser.add_argument('--prefetch', default=8, type=int,
-                    help="number of prefetch (default: 8)")
+parser.add_argument('--prefetch', default=6, type=int,
+                    help="number of prefetch (default: 6)")
 
 # Augmentation parameters
 parser.add_argument('--color_jitter', type=float, default=0.4, metavar='PCT',
@@ -151,7 +151,7 @@ val_dataset = datasets.ImageFolder(
 train_loader = utils.data.DataLoader(
     train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
 val_loader = utils.data.DataLoader(
-    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers // 2, prefetch_factor=args.prefetch // 2, pin_memory=True)
+    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=args.prefetch // 2, pin_memory=True)
 
 
 def accuracy(output, target, topk=(1,)):
