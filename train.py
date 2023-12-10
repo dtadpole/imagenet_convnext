@@ -4,6 +4,7 @@ import argparse
 import wandb
 import torch
 from torch import optim, nn, utils, Tensor
+import torch.distributed as dist
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
@@ -133,6 +134,7 @@ class Model(L.LightningModule):
         self._model = build_model(args.arch)
         self._loss = nn.CrossEntropyLoss()
         self.save_hyperparameters(args)
+        self.train_step_outputs = []
         self.validation_step_outputs = []
         self.wandb_inited = False
 
@@ -146,12 +148,14 @@ class Model(L.LightningModule):
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
         sch.step()
-        self.log_dict({
+        log_dict = {
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
-        })
+        }
+        self.train_step_outputs.append(log_dict)
+        self.log_dict(log_dict)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -166,25 +170,39 @@ class Model(L.LightningModule):
             "val_acc5": acc5,
         }
         self.validation_step_outputs.append(log_dict)
+        self.log_dict(log_dict)
 
     def on_validation_epoch_end(self):
-        # outs is a list of whatever stored in `validation_step`
-        outs = self.validation_step_outputs
-        loss = torch.stack([x['val_loss'] for x in outs]).mean()
-        acc1 = torch.stack([x['val_acc1'] for x in outs]).mean()
-        acc5 = torch.stack([x['val_acc5'] for x in outs]).mean()
-        self.validation_step_outputs.clear()  # free memory
+        # val_outs is a list of whatever stored in `validation_step`
+        val_outs = self.validation_step_outputs
+        val_loss = torch.stack([x['val_loss'] for x in val_outs]).mean()
+        val_acc1 = torch.stack([x['val_acc1'] for x in val_outs]).mean()
+        val_acc5 = torch.stack([x['val_acc5'] for x in val_outs]).mean()
+        self.validation_step_outputs.clear()  # free val memory
+        # train_outs is a list of whatever stored in `train_step`
+        train_outs = self.train_step_outputs
+        train_loss = torch.stack([x['train_loss'] for x in train_outs]).mean() if len(train_outs) > 0 else val_loss
+        train_acc1 = torch.stack([x['train_acc1'] for x in train_outs]).mean() if len(train_outs) > 0 else val_acc1
+        train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(train_outs) > 0 else val_acc5
+        self.train_step_outputs.clear()  # free train memory
+        # all_gather
+        tensorized = torch.Tensor([train_loss, train_acc1, train_acc5, val_loss, val_acc1, val_acc5]).cuda()
+        gather_t = [torch.ones_like(tensorized) for _ in range(dist.get_world_size())]
+        dist.all_gather(gather_t, tensorized)
+        result_t = torch.mean(torch.stack(gather_t), dim=0)
         # get lr
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
         # log results
         log_dict = {
-            "val_loss": loss,
-            "val_acc1": acc1,
-            "val_acc5": acc5,
-            "val_lr": lr,
+            "train_loss": result_t[0],
+            "train_acc1": result_t[1],
+            "train_acc5": result_t[2],
+            "val_loss": result_t[3],
+            "val_acc1": result_t[4],
+            "val_acc5": result_t[5],
+            "train_lr": lr,
         }
-        self.log_dict(log_dict, sync_dist=True)
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
