@@ -87,8 +87,8 @@ parser.add_argument('--mixup_mode', type=str, default='batch',
 # transforms
 parser.add_argument('--transform_ops', default=2, type=int,
                     help='number of ops, default 2')
-parser.add_argument('--transform_mag', default=15, type=int,
-                    help="magnitude (default: 15)")
+parser.add_argument('--transform_mag', default=10, type=int,
+                    help="magnitude (default: 10)")
 args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
