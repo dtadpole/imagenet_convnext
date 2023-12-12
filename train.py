@@ -32,8 +32,8 @@ parser.add_argument('--epoch', default=60, type=int,
                     help="total epoch (default: 60)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
-parser.add_argument('--finetune_epoch', default=10, type=float,
-                    help='finetune epoch (default: 10)')
+parser.add_argument('--finetune_epoch', default=5, type=float,
+                    help='finetune epoch (default: 5)')
 parser.add_argument('--lr', default=6e-4, type=float,
                     help="learning rate (default: 6e-4)")
 parser.add_argument('--lr_end', default=6e-5, type=float,
