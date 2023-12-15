@@ -34,10 +34,10 @@ parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
 parser.add_argument('--finetune_epoch', default=5, type=float,
                     help='finetune epoch (default: 5)')
-parser.add_argument('--lr', default=6e-4, type=float,
-                    help="learning rate (default: 6e-4)")
-parser.add_argument('--lr_end', default=6e-5, type=float,
-                    help="ending learning rate (default: 6e-5)")
+parser.add_argument('--lr', default=3e-4, type=float,
+                    help="learning rate (default: 3e-4)")
+parser.add_argument('--lr_end', default=3e-5, type=float,
+                    help="ending learning rate (default: 3e-5)")
 
 # drop rate
 parser.add_argument('--drop_rate', default=0.1, type=float,
@@ -142,9 +142,19 @@ val_dataset = datasets.ImageFolder(
     ]))
 
 train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
+    train_dataset,
+    batch_size=args.batch_size,
+    shuffle=True,
+    num_workers=args.workers,
+    prefetch_factor=args.prefetch,
+    pin_memory=True)
 val_loader = DataLoader(
-    val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, prefetch_factor=args.prefetch, pin_memory=True)
+    val_dataset,
+    batch_size=args.batch_size,
+    shuffle=False,
+    num_workers=args.workers,
+    prefetch_factor=args.prefetch,
+    pin_memory=True)
 
 
 def accuracy(output, target, topk=(1,)):
@@ -289,8 +299,16 @@ class Model(L.LightningModule):
     def configure_optimizers(self):
         iters_per_epoch = self._num_iters_per_epoch()
         print('iters_per_epoch', iters_per_epoch)
+        effective_batch_size = args.batch_size * self.trainer.num_devices
+        effective_lr = args.lr * effective_batch_size / 256
+        effective_lr_end = args.lr_end * effective_batch_size / 256
+        print('effective_batch_size', effective_batch_size,
+              'effective_lr', effective_lr, effective_lr_end)
         optimizer = optim.AdamW(
-            self.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), weight_decay=args.weight_decay)
+            self.parameters(),
+            lr=effective_lr,
+            betas=(args.beta1, args.beta2),
+            weight_decay=args.weight_decay)
         warmup_scheduler = LinearLR(optimizer,
                                     start_factor=1e-4,
                                     end_factor=1.0,
@@ -299,10 +317,10 @@ class Model(L.LightningModule):
                                            iters_per_epoch *
                                            (args.epoch-args.warmup_epoch -
                                             args.finetune_epoch),
-                                           eta_min=args.lr_end)
+                                           eta_min=effective_lr_end)
         finetune_scheduler = LinearLR(optimizer,
-                                      start_factor=args.lr_end/args.lr,
-                                      end_factor=args.lr_end/args.lr,
+                                      start_factor=effective_lr_end/effective_lr,
+                                      end_factor=effective_lr_end/effective_lr,
                                       total_iters=math.ceil(iters_per_epoch*args.finetune_epoch))
         scheduler = SequentialLR(optimizer,
                                  schedulers=[
@@ -331,6 +349,9 @@ checkpoint_callback = ModelCheckpoint(
     save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
 
 trainer = L.Trainer(limit_train_batches=None, max_epochs=args.epoch, profiler="simple",
-                    precision=args.precision, callbacks=[DeviceStatsMonitor(), checkpoint_callback])
+                    precision=args.precision, callbacks=[
+                        DeviceStatsMonitor(),
+                        checkpoint_callback
+                    ])
 trainer.fit(model=model, train_dataloaders=train_loader,
             val_dataloaders=val_loader)
