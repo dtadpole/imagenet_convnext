@@ -149,6 +149,7 @@ train_loader = DataLoader(
     shuffle=True,
     num_workers=args.workers,
     prefetch_factor=args.prefetch,
+    persistent_workers=True,
     pin_memory=True)
 val_loader = DataLoader(
     val_dataset,
@@ -156,6 +157,7 @@ val_loader = DataLoader(
     shuffle=False,
     num_workers=args.workers,
     prefetch_factor=args.prefetch,
+    persistent_workers=True,
     pin_memory=True)
 
 
