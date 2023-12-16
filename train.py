@@ -314,13 +314,13 @@ class Model(L.LightningModule):
 
     def configure_optimizers(self):
         iters_per_epoch = self._num_iters_per_epoch()
-        print('iters_per_epoch', f"{iters_per_epoch:.2f}")
         effective_batch_size = args.batch_size * \
             self.trainer.num_devices * self.trainer.accumulate_grad_batches
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
-        print('effective_batch_size', f"{effective_batch_size:_}",
-              'effective_lr', f"{effective_lr:.2e}", f"{effective_lr_end:.2e}")
+        print(f'Iters per Epoch: [{iters_per_epoch:.2f}], ',
+              f'Effective Batch Size: [{effective_batch_size:_}], ',
+              f'Effective lr: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
         optimizer = optim.AdamW(
             self.parameters(),
             lr=effective_lr,
