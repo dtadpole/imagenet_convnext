@@ -313,12 +313,12 @@ class Model(L.LightningModule):
             wandb.log(log_dict)
 
     def configure_optimizers(self):
-        iters_per_epoch = self._num_iters_per_epoch()
+        steps_per_epoch = self._num_iters_per_epoch() / self.trainer.accumulate_grad_batches
         effective_batch_size = args.batch_size * \
             self.trainer.num_devices * self.trainer.accumulate_grad_batches
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
-        print(f'Iters per Epoch: [{iters_per_epoch:.2f}], ',
+        print(f'Steps per Epoch: [{steps_per_epoch:.2f}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
               f'Effective lr: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
         optimizer = optim.AdamW(
@@ -329,25 +329,25 @@ class Model(L.LightningModule):
         warmup_scheduler = LinearLR(optimizer,
                                     start_factor=1e-4,
                                     end_factor=1.0,
-                                    total_iters=math.ceil(iters_per_epoch*args.warmup_epoch))
+                                    total_iters=math.ceil(steps_per_epoch*args.warmup_epoch))
         main_scheduler = CosineAnnealingLR(optimizer,
-                                           iters_per_epoch *
+                                           steps_per_epoch *
                                            (args.epoch-args.warmup_epoch -
                                             args.finetune_epoch),
                                            eta_min=effective_lr_end)
         finetune_scheduler = LinearLR(optimizer,
                                       start_factor=effective_lr_end/effective_lr,
                                       end_factor=effective_lr_end/effective_lr,
-                                      total_iters=math.ceil(iters_per_epoch*args.finetune_epoch))
+                                      total_iters=math.ceil(steps_per_epoch*args.finetune_epoch))
         scheduler = SequentialLR(optimizer,
                                  schedulers=[
                                      warmup_scheduler,
                                      main_scheduler,
                                      finetune_scheduler],
                                  milestones=[
-                                     math.ceil(iters_per_epoch *
+                                     math.ceil(steps_per_epoch *
                                                args.warmup_epoch),
-                                     math.ceil(iters_per_epoch*(args.epoch-args.finetune_epoch))])
+                                     math.ceil(steps_per_epoch*(args.epoch-args.finetune_epoch))])
         return [optimizer], [scheduler]
 
     def _num_iters_per_epoch(self) -> float:
