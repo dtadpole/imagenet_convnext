@@ -320,7 +320,7 @@ class Model(L.LightningModule):
         effective_lr_end = args.lr_end * effective_batch_size / 256
         print(f'Steps per Epoch: [{steps_per_epoch:.2f}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
-              f'Effective lr: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+              f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
         optimizer = optim.AdamW(
             self.parameters(),
             lr=effective_lr,
