@@ -38,6 +38,8 @@ parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=3e-5, type=float,
                     help="ending learning rate (default: 3e-5)")
+parser.add_argument('--accumulate_grad', default=4, type=int,
+                    help="accumulate gradient (default: 4)")
 
 # drop rate
 parser.add_argument('--drop_rate', default=0.1, type=float,
@@ -201,23 +203,22 @@ class Model(L.LightningModule):
             mixup_images, mixup_targets = mixup_fn(images, targets)
             mixup_output = self._model(mixup_images)
             loss = self._train_loss_fn(mixup_output, mixup_targets)
-            with torch.no_grad():
-                output = self._model(images)
-                loss_raw = self._eval_loss_fn(output, targets)
+            # with torch.no_grad():
+            # output = self._model(images)
+            # loss_raw = self._eval_loss_fn(output, targets)
+            output = mixup_output
         else:
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
-            loss_raw = loss
+            # loss_raw = loss
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-        # step lr scheduler
         sch = self.lr_schedulers()
         lr = sch.get_last_lr()[0]
-        sch.step()
         # log
         self.log_dict({
             "train_loss": loss,
-            "train_loss_raw": loss_raw,
+            # "train_loss_raw": loss_raw,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
@@ -227,9 +228,24 @@ class Model(L.LightningModule):
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
+            "train_lr": lr,
         })
         # return
         return loss
+
+    def optimizer_step(
+        self,
+        epoch,
+        batch_idx,
+        optimizer,
+        optimizer_closure,
+    ):
+        # default lightning module
+        optimizer.step(closure=optimizer_closure)
+        # step lr scheduler
+        sch = self.lr_schedulers()
+        lr = sch.get_last_lr()[0]
+        sch.step()
 
     def validation_step(self, batch, batch_idx):
         # validation_step defines the validation loop.
@@ -298,12 +314,13 @@ class Model(L.LightningModule):
 
     def configure_optimizers(self):
         iters_per_epoch = self._num_iters_per_epoch()
-        print('iters_per_epoch', iters_per_epoch)
-        effective_batch_size = args.batch_size * self.trainer.num_devices
+        print('iters_per_epoch', f"{iters_per_epoch:.2f}")
+        effective_batch_size = args.batch_size * \
+            self.trainer.num_devices * self.trainer.accumulate_grad_batches
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
-        print('effective_batch_size', effective_batch_size,
-              'effective_lr', effective_lr, effective_lr_end)
+        print('effective_batch_size', f"{effective_batch_size:_}",
+              'effective_lr', f"{effective_lr:.2e}", f"{effective_lr_end:.2e}")
         optimizer = optim.AdamW(
             self.parameters(),
             lr=effective_lr,
@@ -348,8 +365,12 @@ if args.compile:
 checkpoint_callback = ModelCheckpoint(
     save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
 
-trainer = L.Trainer(limit_train_batches=None, max_epochs=args.epoch, profiler="simple",
-                    precision=args.precision, callbacks=[
+trainer = L.Trainer(limit_train_batches=None,
+                    max_epochs=args.epoch,
+                    profiler="simple",
+                    precision=args.precision,
+                    accumulate_grad_batches=args.accumulate_grad,
+                    callbacks=[
                         DeviceStatsMonitor(),
                         checkpoint_callback
                     ])
