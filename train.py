@@ -374,7 +374,7 @@ checkpoint_callback = ModelCheckpoint(
 
 trainer = L.Trainer(limit_train_batches=None,
                     max_epochs=args.epoch,
-                    profiler="pytorch",
+                    profiler="simple",
                     precision=args.precision,
                     accumulate_grad_batches=args.accumulate_grad,
                     gradient_clip_val=args.gradient_clipping
