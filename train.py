@@ -38,8 +38,10 @@ parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=3e-5, type=float,
                     help="ending learning rate (default: 3e-5)")
-parser.add_argument('--accumulate_grad', default=4, type=int,
-                    help="accumulate gradient (default: 4)")
+parser.add_argument('--accumulate_grad', default=8, type=int,
+                    help="accumulate gradient (default: 8)")
+parser.add_argument('--gradient_clipping', default=1.0, type=float,
+                    help="gradient clipping (default: 1.0)")
 
 # drop rate
 parser.add_argument('--drop_rate', default=0.1, type=float,
@@ -63,7 +65,7 @@ parser.add_argument('--workers', default=5, type=int,
 parser.add_argument('--prefetch', default=5, type=int,
                     help="number of prefetch (default: 5)")
 
-# * Mixup params
+# Mixup params
 parser.add_argument('--mixup', type=float, default=0.8,
                     help='mixup alpha, mixup enabled if > 0.')
 parser.add_argument('--cutmix', type=float, default=1.0,
@@ -82,8 +84,8 @@ parser.add_argument('--smoothing', type=float, default=0.1,
 # transforms
 parser.add_argument('--transform_ops', default=2, type=int,
                     help='number of ops, default 2')
-parser.add_argument('--transform_mag', default=10, type=int,
-                    help="magnitude (default: 10)")
+parser.add_argument('--transform_mag', default=15, type=int,
+                    help="magnitude (default: 15)")
 args = parser.parse_args()
 
 torch.set_float32_matmul_precision('medium')
@@ -365,13 +367,17 @@ if args.compile:
 
 
 checkpoint_callback = ModelCheckpoint(
-    save_top_k=3, monitor="val_acc1", mode="max", filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
+    save_top_k=3,
+    monitor="val_acc1",
+    mode="max",
+    filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
 
 trainer = L.Trainer(limit_train_batches=None,
                     max_epochs=args.epoch,
-                    profiler="simple",
+                    profiler="pytorch",
                     precision=args.precision,
                     accumulate_grad_batches=args.accumulate_grad,
+                    gradient_clip_val=args.gradient_clipping
                     callbacks=[
                         DeviceStatsMonitor(),
                         checkpoint_callback
