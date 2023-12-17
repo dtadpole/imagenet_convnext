@@ -31,8 +31,8 @@ parser.add_argument('-r', '--resume', default=None, type=str,
                     help="resume checkpoint path (default: None)")
 
 # epoch and lr
-parser.add_argument('--epoch', default=60, type=int,
-                    help="total epoch (default: 60)")
+parser.add_argument('--epoch', default=90, type=int,
+                    help="total epoch (default: 90)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
 parser.add_argument('--finetune_epoch', default=5, type=float,
