@@ -27,6 +27,8 @@ parser.add_argument('-a', '--arch', default='ConvNeXt_T',
                     help='model arch (default: ConvNeXt_T)')
 parser.add_argument('-b', '--batch_size', default=64, type=int,
                     help="batch size (default: 64)")
+parser.add_argument('-r', '--resume', default=None, type=str,
+                    help="resume checkpoint path (default: None)")
 
 # epoch and lr
 parser.add_argument('--epoch', default=60, type=int,
@@ -256,14 +258,14 @@ class Model(L.LightningModule):
         if self.trainer.local_rank == 0:
             if not self._profiled:
                 flops, macs, params = get_model_profile(
-                    model,
-                    input_shape=images.shape,
+                    self._model,
+                    input_shape=tuple(images.shape),
                     args=[images],
                     print_profile=True,
-                    detailed=True,
+                    detailed=False,
                     as_string=True,
                 )
-                print(f'FLOPS: {flops:_}, MACS: {macs:_}, PARAMS: {params:_}')
+                print(f'FLOPS: {flops}, MACS: {macs}, PARAMS: {params}')
                 self._profiled = True
         # validation_step defines the validation loop.
         output = self._model(images)
@@ -392,12 +394,11 @@ trainer = L.Trainer(limit_train_batches=None,
                     gradient_clip_val=args.gradient_clipping,
                     callbacks=[
                         DeviceStatsMonitor(),
-                        RichModelSummary(max_depth=5),
-                        RichProgressBar(),
                         LearningRateMonitor(),
                         checkpoint_callback,
                     ])
 
 trainer.fit(model=model,
             train_dataloaders=train_loader,
-            val_dataloaders=val_loader)
+            val_dataloaders=val_loader,
+            ckpt_path=args.resume)
