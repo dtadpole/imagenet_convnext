@@ -15,14 +15,14 @@ from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vi
 from maxvit import MaxViT
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from flops_profiler.profiler import get_model_profile
+from train import PreTrainModule, build_data_loader, build_mixup_fn, accuracy
 
 wandb_project = "ImageNet"
 
 torch.set_float32_matmul_precision('medium')
 
 
-def parse_pretrain_args():
+def parse_finetune_args():
     # basic params
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('-f', '--folder', default='./imagenet/',
@@ -31,18 +31,14 @@ def parse_pretrain_args():
                         help='model arch (default: ConvNeXt_T)')
     parser.add_argument('-b', '--batch_size', default=64, type=int,
                         help="batch size (default: 64)")
-    parser.add_argument('-r', '--resume', default=None, type=str,
-                        help="resume checkpoint path (default: None)")
+    parser.add_argument('-t', '--finetune', required=True, type=str,
+                        help="finetune checkpoint path (required: True)")
 
     # epoch and lr
-    parser.add_argument('--epoch', default=60, type=int,
-                        help="total epoch (default: 60)")
-    parser.add_argument('--warmup_epoch', default=5, type=float,
-                        help='warmup epoch (default: 5)')
-    parser.add_argument('--lr', default=3e-4, type=float,
-                        help="learning rate (default: 3e-4)")
-    parser.add_argument('--lr_end', default=1e-6, type=float,
-                        help="ending learning rate (default: 1e-6)")
+    parser.add_argument('--epoch', default=20, type=int,
+                        help="total epoch (default: 20)")
+    parser.add_argument('--lr', default=3e-5, type=float,
+                        help="learning rate (default: 3e-5)")
     parser.add_argument('--accumulate_grad', default=4, type=int,
                         help="accumulate gradient (default: 4)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
@@ -57,8 +53,10 @@ def parse_pretrain_args():
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=0.1, type=float,
-                        help='weight decay (default: 0.1)')
+    parser.add_argument('--weight_decay', default=1e-8, type=float,
+                        help='weight decay (default: 1e-8)')
+    parser.add_argument('--ema_decay', default=0.9999, type=float,
+                        help='model ema decay (default: 0.9999)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
@@ -95,107 +93,16 @@ def parse_pretrain_args():
     return args
 
 
-def build_model(args):
-    if args.arch.lower() == "ConvNeXt_T".lower():
-        return convnext_tiny(drop_path_rate=args.drop_path_rate)
-    elif args.arch == "ConvNeXt_S".lower():
-        return convnext_small(drop_path_rate=args.drop_path_rate)
-    elif args.arch == "ConvNeXt_S2".lower():
-        return convnext_small_2(drop_path_rate=args.drop_path_rate)
-    elif args.arch.lower() == "ConvNeXt_B".lower():
-        return convnext_base(drop_path_rate=args.drop_path_rate)
-    elif args.arch.lower() == "ConvNeXt_L".lower():
-        return convnext_large(drop_path_rate=args.drop_path_rate)
-    elif args.arch.lower() == "ConvNeXt_XL".lower():
-        return convnext_xlarge(drop_path_rate=args.drop_path_rate)
-    elif args.arch.lower() == "MaxViT_T".lower():
-        return max_vit_tiny_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
-    elif args.arch.lower() == "MaxViT_S".lower():
-        return max_vit_small_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
-    elif args.arch.lower() == "MaxViT_B".lower():
-        return max_vit_base_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
-    elif args.arch.lower() == "MaxViT_L".lower():
-        return max_vit_large_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
-    else:
-        raise Exception('Unknown arch %s' % args.arch)
-
-
-def build_data_loader(args):
-    # train dataset
-    train_dataset = datasets.ImageFolder(
-        os.path.join(args.folder, 'train'),
-        transforms.Compose([
-            transforms.RandAugment(num_ops=args.transform_ops,
-                                magnitude=args.transform_mag),
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-        ]))
-
-    val_dataset = datasets.ImageFolder(
-        os.path.join(args.folder, 'val'),
-        transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-        ]))
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.workers,
-        prefetch_factor=args.prefetch,
-        persistent_workers=True,
-        pin_memory=True)
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.workers,
-        prefetch_factor=args.prefetch,
-        persistent_workers=True,
-        pin_memory=True)
-    
-    return train_loader, val_loader
-
-# mixup
-def build_mixup_fn(args):
-    mixup_fn = None
-    mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
-    if mixup_active:
-        print("Mixup is activated!")
-        mixup_fn = Mixup(
-            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-            label_smoothing=args.smoothing)
-    return mixup_fn
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
-
-class PreTrainModule(L.LightningModule):
+class FinetuneModule(L.LightningModule):
 
     def __init__(self, args, train_loader, val_loader):
         super().__init__()
         self._args = args
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self._model = build_model(args.arch)
         self._mixup_fn = build_mixup_fn(args)
+        self._model = PreTrainModule.load_from_checkpoint(args.finetune)._model
+        self._model_ema = PreTrainModule.load_from_checkpoint(args.finetune)._model
         if self._mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
             self._eval_loss_fn = nn.CrossEntropyLoss()
@@ -229,21 +136,19 @@ class PreTrainModule(L.LightningModule):
             # loss_raw = loss
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-        sch = self.lr_schedulers()
-        lr = sch.get_last_lr()[0]
         # log
         self.log_dict({
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
-            "train_lr": lr,
+            "train_lr": self._args.lr,
         })
         # buffer
         self.train_step_outputs.append({
             "train_loss": loss,
             "train_acc1": acc1,
             "train_acc5": acc5,
-            "train_lr": lr,
+            "train_lr": self._args.lr,
         })
         # return
         return loss
@@ -255,29 +160,14 @@ class PreTrainModule(L.LightningModule):
         optimizer,
         optimizer_closure,
     ):
-        # default lightning module
         optimizer.step(closure=optimizer_closure)
-        # step lr scheduler
-        sch = self.lr_schedulers()
-        sch.step()
-
+        # update model ema
+        self._model_ema.update(self._model.parameters())
+        
     def validation_step(self, batch, batch_idx):
         images, targets = batch
-        if self.trainer.local_rank == 0:
-            if not self._profiled:
-                flops, macs, params = get_model_profile(
-                    self._model,
-                    input_shape=tuple(images.shape),
-                    args=[images],
-                    print_profile=True,
-                    detailed=False,
-                    as_string=True,
-                )
-                print(f'FLOPS: {flops}, MACS: {macs}, PARAMS: {params}')
-                print('-'*80)
-                self._profiled = True
         # validation_step defines the validation loop.
-        output = self._model(images)
+        output = self._model_ema(images)
         loss = self._eval_loss_fn(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
@@ -317,9 +207,6 @@ class PreTrainModule(L.LightningModule):
                     for _ in range(dist.get_world_size())]
         dist.all_gather(gather_t, tensorized)
         result_t = torch.mean(torch.stack(gather_t), dim=0)
-        # get lr
-        sch = self.lr_schedulers()
-        lr = sch.get_last_lr()[0]
         # log results
         log_dict = {
             "train_loss": result_t[0],
@@ -328,14 +215,14 @@ class PreTrainModule(L.LightningModule):
             "val_loss": result_t[3],
             "val_acc1": result_t[4],
             "val_acc5": result_t[5],
-            "train_lr": lr,
+            "train_lr": args.lr,
         }
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
                 param_count = sum(p.numel() for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
-                wandb.init(project=wandb_project, name=wandb_name, group="PreTrain", config=self._args)
+                wandb.init(project=wandb_project, name=wandb_name, group="Finetune", config=args)
                 self.wandb_inited = True
                 # print steps, batch size and LR
                 print('-'*80)
@@ -344,25 +231,13 @@ class PreTrainModule(L.LightningModule):
             wandb.log(log_dict)
 
     def configure_optimizers(self):
-        steps_per_epoch, _, effective_lr, effective_lr_end = self._steps_per_epoch()
+        _, _, effective_lr = self._steps_per_epoch()
         optimizer = optim.AdamW(
             self.parameters(),
             lr=effective_lr,
             betas=(args.beta1, args.beta2),
             weight_decay=args.weight_decay)
-        warmup_scheduler = LinearLR(optimizer,
-                                    start_factor=1e-4,
-                                    end_factor=1.0,
-                                    total_iters=steps_per_epoch*args.warmup_epoch)
-        main_scheduler = CosineAnnealingLR(optimizer,
-                                           steps_per_epoch * (args.epoch-args.warmup_epoch),
-                                           eta_min=effective_lr_end)
-        scheduler = SequentialLR(optimizer,
-                                 schedulers=[
-                                     warmup_scheduler,
-                                     main_scheduler],
-                                 milestones=[steps_per_epoch * args.warmup_epoch])
-        return [optimizer], [scheduler]
+        return optimizer
 
     def _steps_per_epoch(self) -> float:
         dataset_size = len(self.train_loader)
@@ -370,22 +245,21 @@ class PreTrainModule(L.LightningModule):
         steps_per_epoch = math.ceil(dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
         effective_lr = args.lr * effective_batch_size / 256
-        effective_lr_end = args.lr_end * effective_batch_size / 256
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
-            f'Effective Batch Size: [{effective_batch_size:_}], ',
-            f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
-        return steps_per_epoch, effective_batch_size, effective_lr, effective_lr_end
+              f'Effective Batch Size: [{effective_batch_size:_}], ',
+              f'Effective LR: [{effective_lr:.2e}]')
+        return steps_per_epoch, effective_batch_size, effective_lr
 
 
 if __name__ == '__main__':
 
-    args = parse_pretrain_args()
+    args = parse_finetune_args()
 
     train_loader, val_loader = build_data_loader(args)
 
-    pretrain_module = PreTrainModule(args, train_loader, val_loader)
+    finetune_module = FinetuneModule(args, train_loader, val_loader)
     if args.compile:
-        model = torch.compile(pretrain_module)
+        model = torch.compile(finetune_module)
 
     checkpoint_callback = ModelCheckpoint(
         save_top_k=3,
@@ -406,7 +280,6 @@ if __name__ == '__main__':
                             checkpoint_callback,
                         ])
 
-    trainer.fit(model=pretrain_module,
+    trainer.fit(model=finetune_module,
                 train_dataloaders=train_loader,
-                val_dataloaders=val_loader,
-                ckpt_path=args.resume)
+                val_dataloaders=val_loader)
