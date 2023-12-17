@@ -266,6 +266,7 @@ class Model(L.LightningModule):
                     as_string=True,
                 )
                 print(f'FLOPS: {flops}, MACS: {macs}, PARAMS: {params}')
+                print('-'*80)
                 self._profiled = True
         # validation_step defines the validation loop.
         output = self._model(images)
@@ -328,6 +329,17 @@ class Model(L.LightningModule):
                 wandb_name = model_name + '__' + f"{param_count:_}"
                 wandb.init(project=wandb_project, name=wandb_name, config=args)
                 self.wandb_inited = True
+                # print steps, batch size and LR
+                steps_per_epoch = self._num_iters_per_epoch() / self.trainer.accumulate_grad_batches
+                effective_batch_size = args.batch_size * \
+                    self.trainer.num_devices * self.trainer.accumulate_grad_batches
+                effective_lr = args.lr * effective_batch_size / 256
+                effective_lr_end = args.lr_end * effective_batch_size / 256
+                print('-'*80)
+                print(f'Steps per Epoch: [{steps_per_epoch:.2f}], ',
+                    f'Effective Batch Size: [{effective_batch_size:_}], ',
+                    f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+                print('-'*80)
             wandb.log(log_dict)
 
     def configure_optimizers(self):
