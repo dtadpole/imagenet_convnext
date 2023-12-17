@@ -404,6 +404,7 @@ trainer = L.Trainer(limit_train_batches=None,
                     precision=args.precision,
                     accumulate_grad_batches=args.accumulate_grad,
                     gradient_clip_val=args.gradient_clipping,
+                    log_every_n_steps=10,
                     callbacks=[
                         DeviceStatsMonitor(),
                         LearningRateMonitor(),
