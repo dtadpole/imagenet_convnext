@@ -35,12 +35,14 @@ parser.add_argument('--epoch', default=90, type=int,
                     help="total epoch (default: 90)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
-parser.add_argument('--finetune_epoch', default=5, type=float,
-                    help='finetune epoch (default: 5)')
+parser.add_argument('--finetune_epoch', default=10, type=float,
+                    help='finetune epoch (default: 10)')
 parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
-parser.add_argument('--lr_end', default=1e-5, type=float,
-                    help="ending learning rate (default: 1e-5)")
+parser.add_argument('--lr_end', default=1e-6, type=float,
+                    help="ending learning rate (default: 1e-6)")
+parser.add_argument('--lr_finetune', default=5e-6, type=float,
+                    help="finetune learning rate (default: 5e-6)")
 parser.add_argument('--accumulate_grad', default=4, type=int,
                     help="accumulate gradient (default: 4)")
 parser.add_argument('--gradient_clipping', default=1.0, type=float,
@@ -335,10 +337,11 @@ class Model(L.LightningModule):
                     self.trainer.num_devices * self.trainer.accumulate_grad_batches
                 effective_lr = args.lr * effective_batch_size / 256
                 effective_lr_end = args.lr_end * effective_batch_size / 256
+                effective_lr_finetune = args.lr_finetune * effective_batch_size / 256
                 print('-'*80)
                 print(f'Steps per Epoch: [{steps_per_epoch:.2f}], ',
                     f'Effective Batch Size: [{effective_batch_size:_}], ',
-                    f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+                    f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}, {effective_lr_finetune:.2e}]')
                 print('-'*80)
             wandb.log(log_dict)
 
@@ -348,9 +351,10 @@ class Model(L.LightningModule):
             self.trainer.num_devices * self.trainer.accumulate_grad_batches
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
+        effective_lr_finetune = args.lr_finetune * effective_batch_size / 256
         print(f'Steps per Epoch: [{steps_per_epoch:.2f}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
-              f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+              f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}, {effective_lr_finetune:.2e}]')
         optimizer = optim.AdamW(
             self.parameters(),
             lr=effective_lr,
@@ -366,8 +370,8 @@ class Model(L.LightningModule):
                                             args.finetune_epoch),
                                            eta_min=effective_lr_end)
         finetune_scheduler = LinearLR(optimizer,
-                                      start_factor=effective_lr_end/effective_lr,
-                                      end_factor=effective_lr_end/effective_lr,
+                                      start_factor=effective_lr_finetune/effective_lr,
+                                      end_factor=effective_lr_finetune/effective_lr,
                                       total_iters=math.ceil(steps_per_epoch*args.finetune_epoch))
         scheduler = SequentialLR(optimizer,
                                  schedulers=[
