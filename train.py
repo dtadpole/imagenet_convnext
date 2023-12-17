@@ -224,7 +224,6 @@ class Model(L.LightningModule):
         # log
         self.log_dict({
             "train_loss": loss,
-            # "train_loss_raw": loss_raw,
             "train_acc1": acc1,
             "train_acc5": acc5,
             "train_lr": lr,
@@ -250,17 +249,16 @@ class Model(L.LightningModule):
         optimizer.step(closure=optimizer_closure)
         # step lr scheduler
         sch = self.lr_schedulers()
-        lr = sch.get_last_lr()[0]
         sch.step()
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         if self.trainer.local_rank == 0:
             if not self._profiled:
-                # TODO
                 flops, macs, params = get_model_profile(
                     model,
-                    kwargs=images,
+                    input_shape=images.shape,
+                    args=[images],
                     print_profile=True,
                     detailed=True,
                     as_string=True,
