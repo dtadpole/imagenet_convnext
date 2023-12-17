@@ -45,6 +45,8 @@ parser.add_argument('--lr_finetune', default=5e-6, type=float,
                     help="finetune learning rate (default: 5e-6)")
 parser.add_argument('--accumulate_grad', default=4, type=int,
                     help="accumulate gradient (default: 4)")
+parser.add_argument('--finetune_accumulate_grad', default=1, type=int,
+                    help="finetune accumulate gradient (default: 1)")
 parser.add_argument('--gradient_clipping', default=1.0, type=float,
                     help="gradient clipping (default: 1.0)")
 
@@ -414,7 +416,7 @@ trainer = L.Trainer(limit_train_batches=None,
                         LearningRateMonitor(),
                         GradientAccumulationScheduler(scheduling={
                             0: args.accumulate_grad,
-                            args.epoch - args.finetune_epoch: 1,
+                            args.epoch - args.finetune_epoch: args.finetune_accumulate_grad,
                         }),
                         checkpoint_callback,
                     ])
