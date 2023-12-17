@@ -39,8 +39,8 @@ parser.add_argument('--finetune_epoch', default=5, type=float,
                     help='finetune epoch (default: 5)')
 parser.add_argument('--lr', default=2e-4, type=float,
                     help="learning rate (default: 2e-4)")
-parser.add_argument('--lr_end', default=1e-5, type=float,
-                    help="ending learning rate (default: 1e-5)")
+parser.add_argument('--lr_end', default=5e-6, type=float,
+                    help="ending learning rate (default: 5e-6)")
 parser.add_argument('--accumulate_grad', default=8, type=int,
                     help="accumulate gradient (default: 8)")
 parser.add_argument('--gradient_clipping', default=1.0, type=float,
