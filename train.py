@@ -391,7 +391,7 @@ trainer = L.Trainer(limit_train_batches=None,
                     profiler="simple",
                     precision=args.precision,
                     accumulate_grad_batches=args.accumulate_grad,
-                    gradient_clip_val=args.gradient_clipping
+                    gradient_clip_val=args.gradient_clipping,
                     callbacks=[
                         DeviceStatsMonitor(),
                         RichModelSummary(max_depth=5),
