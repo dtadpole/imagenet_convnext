@@ -9,7 +9,7 @@ import torch.distributed as dist
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor
+from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, RichModelSummary, RichProgressBar, LearningRateMonitor
 from convnext import convnext_tiny, convnext_small, convnext_small_2, convnext_base, convnext_large, convnext_xlarge
 from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
 from maxvit import MaxViT
@@ -380,7 +380,12 @@ trainer = L.Trainer(limit_train_batches=None,
                     gradient_clip_val=args.gradient_clipping
                     callbacks=[
                         DeviceStatsMonitor(),
-                        checkpoint_callback
+                        RichModelSummary(max_depth=3),
+                        RichProgressBar(),
+                        LearningRateMonitor(),
+                        checkpoint_callback,
                     ])
-trainer.fit(model=model, train_dataloaders=train_loader,
+
+trainer.fit(model=model,
+            train_dataloaders=train_loader,
             val_dataloaders=val_loader)
