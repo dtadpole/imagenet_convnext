@@ -9,7 +9,7 @@ import torch.distributed as dist
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, RichModelSummary, RichProgressBar, LearningRateMonitor
+from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
 from convnext import convnext_tiny, convnext_small, convnext_small_2, convnext_base, convnext_large, convnext_xlarge
 from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
 from maxvit import MaxViT
@@ -332,9 +332,9 @@ class Model(L.LightningModule):
                 wandb.init(project=wandb_project, name=wandb_name, group=model_name, config=args)
                 self.wandb_inited = True
                 # print steps, batch size and LR
-                steps_per_epoch = self._num_iters_per_epoch() / self.trainer.accumulate_grad_batches
+                steps_per_epoch = self._num_iters_per_epoch() / args.accumulate_grad
                 effective_batch_size = args.batch_size * \
-                    self.trainer.num_devices * self.trainer.accumulate_grad_batches
+                    self.trainer.num_devices * args.accumulate_grad
                 effective_lr = args.lr * effective_batch_size / 256
                 effective_lr_end = args.lr_end * effective_batch_size / 256
                 effective_lr_finetune = args.lr_finetune * effective_batch_size / 256
@@ -346,9 +346,9 @@ class Model(L.LightningModule):
             wandb.log(log_dict)
 
     def configure_optimizers(self):
-        steps_per_epoch = self._num_iters_per_epoch() / self.trainer.accumulate_grad_batches
+        steps_per_epoch = self._num_iters_per_epoch() / args.accumulate_grad
         effective_batch_size = args.batch_size * \
-            self.trainer.num_devices * self.trainer.accumulate_grad_batches
+            self.trainer.num_devices * args.accumulate_grad
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
         effective_lr_finetune = args.lr_finetune * effective_batch_size / 256
@@ -406,12 +406,16 @@ trainer = L.Trainer(limit_train_batches=None,
                     max_epochs=args.epoch,
                     profiler="simple",
                     precision=args.precision,
-                    accumulate_grad_batches=args.accumulate_grad,
+                    # accumulate_grad_batches=args.accumulate_grad,
                     gradient_clip_val=args.gradient_clipping,
                     log_every_n_steps=20,
                     callbacks=[
                         DeviceStatsMonitor(),
                         LearningRateMonitor(),
+                        GradientAccumulationScheduler(scheduling={
+                            0: args.accumulate_grad,
+                            args.epoch - args.finetune_epoch: 1,
+                        }),
                         checkpoint_callback,
                     ])
 
