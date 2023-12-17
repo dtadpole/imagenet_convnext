@@ -31,12 +31,12 @@ parser.add_argument('-r', '--resume', default=None, type=str,
                     help="resume checkpoint path (default: None)")
 
 # epoch and lr
-parser.add_argument('--epoch', default=90, type=int,
-                    help="total epoch (default: 90)")
+parser.add_argument('--epoch', default=60, type=int,
+                    help="total epoch (default: 60)")
 parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
-parser.add_argument('--finetune_epoch', default=10, type=float,
-                    help='finetune epoch (default: 10)')
+parser.add_argument('--finetune_epoch', default=5, type=float,
+                    help='finetune epoch (default: 5)')
 parser.add_argument('--lr', default=3e-4, type=float,
                     help="learning rate (default: 3e-4)")
 parser.add_argument('--lr_end', default=1e-6, type=float,
@@ -374,7 +374,7 @@ class Model(L.LightningModule):
         finetune_scheduler = LinearLR(optimizer,
                                       start_factor=effective_lr_finetune/effective_lr,
                                       end_factor=effective_lr_finetune/effective_lr,
-                                      total_iters=math.ceil(steps_per_epoch*args.finetune_epoch))
+                                      total_iters=math.ceil(steps_per_epoch*args.finetune_epoch*args.accumulate_grad/args.finetune_accumulate_grad))
         scheduler = SequentialLR(optimizer,
                                  schedulers=[
                                      warmup_scheduler,
