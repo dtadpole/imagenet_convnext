@@ -15,6 +15,7 @@ from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vi
 from maxvit import MaxViT
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
+from flops_profiler.profiler import get_model_profile
 
 wandb_project = "ImageNet"
 
@@ -199,6 +200,7 @@ class Model(L.LightningModule):
         self.train_step_outputs = []
         self.validation_step_outputs = []
         self.wandb_inited = False
+        self._profiled = False
 
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop.
@@ -252,8 +254,20 @@ class Model(L.LightningModule):
         sch.step()
 
     def validation_step(self, batch, batch_idx):
-        # validation_step defines the validation loop.
         images, targets = batch
+        if self.trainer.local_rank == 0:
+            if not self._profiled:
+                # TODO
+                flops, macs, params = get_model_profile(
+                    model,
+                    kwargs=images,
+                    print_profile=True,
+                    detailed=True,
+                    as_string=True,
+                )
+                print(f'FLOPS: {flops:_}, MACS: {macs:_}, PARAMS: {params:_}')
+                self._profiled = True
+        # validation_step defines the validation loop.
         output = self._model(images)
         loss = self._eval_loss_fn(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
@@ -380,7 +394,7 @@ trainer = L.Trainer(limit_train_batches=None,
                     gradient_clip_val=args.gradient_clipping
                     callbacks=[
                         DeviceStatsMonitor(),
-                        RichModelSummary(max_depth=3),
+                        RichModelSummary(max_depth=5),
                         RichProgressBar(),
                         LearningRateMonitor(),
                         checkpoint_callback,
