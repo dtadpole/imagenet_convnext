@@ -37,8 +37,8 @@ parser.add_argument('--warmup_epoch', default=5, type=float,
                     help='warmup epoch (default: 5)')
 parser.add_argument('--finetune_epoch', default=5, type=float,
                     help='finetune epoch (default: 5)')
-parser.add_argument('--lr', default=3e-4, type=float,
-                    help="learning rate (default: 3e-4)")
+parser.add_argument('--lr', default=2e-4, type=float,
+                    help="learning rate (default: 2e-4)")
 parser.add_argument('--lr_end', default=1e-5, type=float,
                     help="ending learning rate (default: 1e-5)")
 parser.add_argument('--accumulate_grad', default=8, type=int,
@@ -65,8 +65,8 @@ parser.add_argument('--precision', default='bf16-mixed', type=str,
                     help='training precision (default: bf16-mixed)')
 parser.add_argument('--workers', default=5, type=int,
                     help="number of workers (default: 5)")
-parser.add_argument('--prefetch', default=5, type=int,
-                    help="number of prefetch (default: 5)")
+parser.add_argument('--prefetch', default=10, type=int,
+                    help="number of prefetch (default: 10)")
 
 # Mixup params
 parser.add_argument('--mixup', type=float, default=0.8,
@@ -108,13 +108,13 @@ def build_model(arch="ConvNeXt_T"):
     elif arch.lower() == "ConvNeXt_XL".lower():
         return convnext_xlarge(drop_path_rate=args.drop_path_rate)
     elif arch.lower() == "MaxViT_T".lower():
-        return max_vit_tiny_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
+        return max_vit_tiny_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_S".lower():
-        return max_vit_small_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
+        return max_vit_small_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_B".lower():
-        return max_vit_base_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
+        return max_vit_base_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
     elif arch.lower() == "MaxViT_L".lower():
-        return max_vit_large_224(drop=args.drop_rate, drop_path=args.drop_path_rate)
+        return max_vit_large_224(drop=args.drop_rate, attn_drop=args.drop_rate, drop_path=args.drop_path_rate)
     else:
         raise Exception('Unknown arch %s' % arch)
 
@@ -327,7 +327,7 @@ class Model(L.LightningModule):
                 model_name = type(self._model).__name__
                 param_count = sum(p.numel() for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
-                wandb.init(project=wandb_project, name=wandb_name, config=args)
+                wandb.init(project=wandb_project, name=wandb_name, group=model_name, config=args)
                 self.wandb_inited = True
                 # print steps, batch size and LR
                 steps_per_epoch = self._num_iters_per_epoch() / self.trainer.accumulate_grad_batches
