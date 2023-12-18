@@ -32,8 +32,8 @@ def parse_finetune_args():
                         help="finetune checkpoint path (required: True)")
 
     # epoch and lr
-    parser.add_argument('--epoch', default=20, type=int,
-                        help="total epoch (default: 20)")
+    parser.add_argument('--epoch', default=15, type=int,
+                        help="total epoch (default: 15)")
     parser.add_argument('--lr', default=3e-5, type=float,
                         help="learning rate (default: 3e-5)")
     parser.add_argument('--accumulate_grad', default=1, type=int,
