@@ -147,7 +147,6 @@ class FinetuneModule(L.LightningModule):
         images, targets = batch
         if self._mixup_fn is not None:
             mixup_images, mixup_targets = self._mixup_fn(images, targets)
-            # mixup_output = self._model(mixup_images)
             mixup_output = self._model(mixup_images)
             loss = self._train_loss_fn(mixup_output, mixup_targets)
             # with torch.no_grad():
@@ -155,7 +154,6 @@ class FinetuneModule(L.LightningModule):
             # loss_raw = self._eval_loss_fn(output, targets)
             output = mixup_output
         else:
-            # output = self._model(images)
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
             # loss_raw = loss
