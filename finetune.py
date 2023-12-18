@@ -52,8 +52,10 @@ def parse_finetune_args():
                         help="beta2 (default: 0.999)")
     parser.add_argument('--weight_decay', default=1e-8, type=float,
                         help='weight decay (default: 1e-8)')
-    parser.add_argument('--ema_decay', default=0.9999, type=float,
-                        help='model ema decay (default: 0.9999)')
+    parser.add_argument('--ema_decay_eval', default=0.9999, type=float,
+                        help='eval model ema decay (default: 0.9999)')
+    parser.add_argument('--ema_decay_train', default=0.99, type=float,
+                        help='train model ema decay (default: 0.99)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
@@ -154,7 +156,8 @@ class EMA(nn.Module):
         self._update(model, update_fn=lambda e, m: m)
 
 
-model_ema: EMA = None
+model_ema_eval: EMA = None
+model_ema_train: EMA = None
 
 
 class FinetuneModule(L.LightningModule):
@@ -202,9 +205,11 @@ class FinetuneModule(L.LightningModule):
             loss = self._train_loss_fn(output, targets)
             # loss_raw = loss
         # model ema
-        global model_ema
-        if model_ema is None:
-            model_ema = EMA(self._model, decay=self._args.ema_decay)
+        global model_ema_eval, model_ema_train
+        if model_ema_eval is None:
+            model_ema_eval = EMA(self._model, decay=self._args.ema_decay_eval)
+        if model_ema_train is None:
+            model_ema_train = EMA(self._model, decay=self._args.ema_decay_train)
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # log
@@ -224,6 +229,12 @@ class FinetuneModule(L.LightningModule):
         # return
         return loss
 
+    def on_train_epoch_end(self):
+        global model_ema_train
+        with torch.no_grad():
+            for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
+                model_v.copy_(ema_v)
+
     def optimizer_step(
         self,
         epoch,
@@ -233,16 +244,17 @@ class FinetuneModule(L.LightningModule):
     ):
         optimizer.step(closure=optimizer_closure)
         # update ema
-        global model_ema
-        model_ema.update(self._model)
+        global model_ema_eval, model_ema_train
+        model_ema_eval.update(self._model)
+        model_ema_train.update(self._model)
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         # validation_step defines the validation loop.
         # output = self._model(images)
-        global model_ema
-        if model_ema is not None:
-            output = model_ema.module(images)
+        global model_ema_eval
+        if model_ema_eval is not None:
+            output = model_ema_eval.module(images)
         else:
             output = self._model(images)
         loss = self._eval_loss_fn(output, targets)
