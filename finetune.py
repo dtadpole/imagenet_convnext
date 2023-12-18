@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from train import PreTrainModule, build_data_loader, build_mixup_fn, accuracy
+from train import PreTrainModule, build_mixup_fn, accuracy
 
 wandb_project = "ImageNet"
 
@@ -89,6 +89,44 @@ def parse_finetune_args():
     args = parser.parse_args()
     return args
 
+
+def build_data_loader(args):
+    # train dataset
+    train_dataset = datasets.ImageFolder(
+        os.path.join(args.folder, 'train'),
+        transforms.Compose([
+            transforms.RandAugment(num_ops=args.transform_ops,
+                                   magnitude=args.transform_mag),
+            transforms.Resize(224),
+            transforms.ToTensor(),
+        ]))
+
+    val_dataset = datasets.ImageFolder(
+        os.path.join(args.folder, 'val'),
+        transforms.Compose([
+            transforms.Resize(224),
+            transforms.ToTensor(),
+        ]))
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.workers,
+        prefetch_factor=args.prefetch,
+        persistent_workers=True,
+        pin_memory=True)
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.workers,
+        prefetch_factor=args.prefetch,
+        persistent_workers=True,
+        pin_memory=True)
+
+    return train_loader, val_loader
 
 class EMA(nn.Module):
     """ Model Exponential Moving Average V2 from timm"""
