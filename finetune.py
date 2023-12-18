@@ -97,14 +97,16 @@ def build_data_loader(args):
         transforms.Compose([
             transforms.RandAugment(num_ops=args.transform_ops,
                                    magnitude=args.transform_mag),
-            transforms.Resize(224),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
         ]))
 
     val_dataset = datasets.ImageFolder(
         os.path.join(args.folder, 'val'),
         transforms.Compose([
-            transforms.Resize(224),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
         ]))
 
@@ -128,8 +130,10 @@ def build_data_loader(args):
 
     return train_loader, val_loader
 
+
 class EMA(nn.Module):
     """ Model Exponential Moving Average V2 from timm"""
+
     def __init__(self, model, decay=0.9999):
         super(EMA, self).__init__()
         # make a copy of the model for accumulating moving average of weights
@@ -143,10 +147,12 @@ class EMA(nn.Module):
                 ema_v.copy_(update_fn(ema_v, model_v))
 
     def update(self, model):
-        self._update(model, update_fn=lambda e, m: self.decay * e + (1. - self.decay) * m)
+        self._update(model, update_fn=lambda e,
+                     m: self.decay * e + (1. - self.decay) * m)
 
     def set(self, model):
         self._update(model, update_fn=lambda e, m: m)
+
 
 model_ema: EMA = None
 
