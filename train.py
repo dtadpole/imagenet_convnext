@@ -27,8 +27,8 @@ def parse_pretrain_args():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('-f', '--folder', default='./imagenet/',
                         help='path to dataset (default: ./imagenet/)')
-    parser.add_argument('-a', '--arch', default='ConvNeXt_T',
-                        help='model arch (default: ConvNeXt_T)')
+    parser.add_argument('-a', '--arch', default='ConvNeXt_S',
+                        help='model arch (default: ConvNeXt_S)')
     parser.add_argument('-b', '--batch_size', default=64, type=int,
                         help="batch size (default: 64)")
     parser.add_argument('-r', '--resume', default=None, type=str,
@@ -98,9 +98,9 @@ def parse_pretrain_args():
 def build_model(args):
     if args.arch.lower() == "ConvNeXt_T".lower():
         return convnext_tiny(drop_path_rate=args.drop_path_rate)
-    elif args.arch == "ConvNeXt_S".lower():
+    elif args.arch.lower() == "ConvNeXt_S".lower():
         return convnext_small(drop_path_rate=args.drop_path_rate)
-    elif args.arch == "ConvNeXt_S2".lower():
+    elif args.arch.lower() == "ConvNeXt_S2".lower():
         return convnext_small_2(drop_path_rate=args.drop_path_rate)
     elif args.arch.lower() == "ConvNeXt_B".lower():
         return convnext_base(drop_path_rate=args.drop_path_rate)
@@ -126,7 +126,7 @@ def build_data_loader(args):
         os.path.join(args.folder, 'train'),
         transforms.Compose([
             transforms.RandAugment(num_ops=args.transform_ops,
-                                magnitude=args.transform_mag),
+                                   magnitude=args.transform_mag),
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
@@ -156,10 +156,12 @@ def build_data_loader(args):
         prefetch_factor=args.prefetch,
         persistent_workers=True,
         pin_memory=True)
-    
+
     return train_loader, val_loader
 
 # mixup
+
+
 def build_mixup_fn(args):
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
@@ -170,6 +172,7 @@ def build_mixup_fn(args):
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
             label_smoothing=args.smoothing)
     return mixup_fn
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -187,6 +190,7 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+
 class PreTrainModule(L.LightningModule):
 
     def __init__(self, args, train_loader, val_loader):
@@ -194,7 +198,7 @@ class PreTrainModule(L.LightningModule):
         self._args = args
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self._model = build_model(args.arch)
+        self._model = build_model(args)
         self._mixup_fn = build_mixup_fn(args)
         if self._mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
@@ -335,7 +339,8 @@ class PreTrainModule(L.LightningModule):
                 model_name = type(self._model).__name__
                 param_count = sum(p.numel() for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
-                wandb.init(project=wandb_project, name=wandb_name, group="PreTrain", config=self._args)
+                wandb.init(project=wandb_project, name=wandb_name,
+                           group="PreTrain", config=self._args)
                 self.wandb_inited = True
                 # print steps, batch size and LR
                 print('-'*80)
@@ -355,7 +360,8 @@ class PreTrainModule(L.LightningModule):
                                     end_factor=1.0,
                                     total_iters=steps_per_epoch*args.warmup_epoch)
         main_scheduler = CosineAnnealingLR(optimizer,
-                                           steps_per_epoch * (args.epoch-args.warmup_epoch),
+                                           steps_per_epoch *
+                                           (args.epoch-args.warmup_epoch),
                                            eta_min=effective_lr_end)
         scheduler = SequentialLR(optimizer,
                                  schedulers=[
@@ -367,13 +373,14 @@ class PreTrainModule(L.LightningModule):
     def _steps_per_epoch(self) -> float:
         dataset_size = len(self.train_loader)
         num_devices = max(1, self.trainer.num_devices)
-        steps_per_epoch = math.ceil(dataset_size / num_devices / args.accumulate_grad)
+        steps_per_epoch = math.ceil(
+            dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
         effective_lr = args.lr * effective_batch_size / 256
         effective_lr_end = args.lr_end * effective_batch_size / 256
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
-            f'Effective Batch Size: [{effective_batch_size:_}], ',
-            f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+              f'Effective Batch Size: [{effective_batch_size:_}], ',
+              f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
         return steps_per_epoch, effective_batch_size, effective_lr, effective_lr_end
 
 

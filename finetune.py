@@ -10,11 +10,8 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
-from convnext import convnext_tiny, convnext_small, convnext_small_2, convnext_base, convnext_large, convnext_xlarge
-from maxvit import max_vit_tiny_224, max_vit_small_224, max_vit_base_224, max_vit_large_224
-from maxvit import MaxViT
-from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
+from timm.utils import ModelEmaV2
 from train import PreTrainModule, build_data_loader, build_mixup_fn, accuracy
 
 wandb_project = "ImageNet"
@@ -39,8 +36,8 @@ def parse_finetune_args():
                         help="total epoch (default: 20)")
     parser.add_argument('--lr', default=3e-5, type=float,
                         help="learning rate (default: 3e-5)")
-    parser.add_argument('--accumulate_grad', default=4, type=int,
-                        help="accumulate gradient (default: 4)")
+    parser.add_argument('--accumulate_grad', default=1, type=int,
+                        help="accumulate gradient (default: 1)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
                         help="gradient clipping (default: 1.0)")
 
@@ -93,6 +90,9 @@ def parse_finetune_args():
     return args
 
 
+model_ema: ModelEmaV2 = None
+
+
 class FinetuneModule(L.LightningModule):
 
     def __init__(self, args, train_loader, val_loader):
@@ -101,8 +101,11 @@ class FinetuneModule(L.LightningModule):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self._mixup_fn = build_mixup_fn(args)
-        self._model = PreTrainModule.load_from_checkpoint(args.finetune)._model
-        self._model_ema = PreTrainModule.load_from_checkpoint(args.finetune)._model
+        checkpoint = PreTrainModule.load_from_checkpoint(
+            args.finetune, args=args, train_loader=train_loader, val_loader=val_loader)
+        self._model = checkpoint._model
+        # self._train_loss_fn = checkpoint._train_loss_fn
+        # self._eval_loss_fn = checkpoint._eval_loss_fn
         if self._mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
             self._eval_loss_fn = nn.CrossEntropyLoss()
@@ -153,21 +156,17 @@ class FinetuneModule(L.LightningModule):
         # return
         return loss
 
-    def optimizer_step(
-        self,
-        epoch,
-        batch_idx,
-        optimizer,
-        optimizer_closure,
-    ):
-        optimizer.step(closure=optimizer_closure)
-        # update model ema
-        self._model_ema.update(self._model.parameters())
-        
+    def on_before_zero_grad(self, *args, **kwargs):
+        global model_ema
+        if model_ema is None:
+            model_ema = ModelEmaV2(self._model, decay=self._args.ema_decay)
+        model_ema.update(self._model)
+        # pass
+
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         # validation_step defines the validation loop.
-        output = self._model_ema(images)
+        output = self._model(images)
         loss = self._eval_loss_fn(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
@@ -222,7 +221,8 @@ class FinetuneModule(L.LightningModule):
                 model_name = type(self._model).__name__
                 param_count = sum(p.numel() for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
-                wandb.init(project=wandb_project, name=wandb_name, group="Finetune", config=args)
+                wandb.init(project=wandb_project, name=wandb_name,
+                           group="Finetune", config=args)
                 self.wandb_inited = True
                 # print steps, batch size and LR
                 print('-'*80)
@@ -242,7 +242,8 @@ class FinetuneModule(L.LightningModule):
     def _steps_per_epoch(self) -> float:
         dataset_size = len(self.train_loader)
         num_devices = max(1, self.trainer.num_devices)
-        steps_per_epoch = math.ceil(dataset_size / num_devices / args.accumulate_grad)
+        steps_per_epoch = math.ceil(
+            dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
         effective_lr = args.lr * effective_batch_size / 256
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
