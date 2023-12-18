@@ -2,6 +2,7 @@ import os
 import math
 import argparse
 import wandb
+from copy import deepcopy
 import torch
 from torch import optim, nn, utils, Tensor
 from torch.utils.data import DataLoader
@@ -11,7 +12,6 @@ from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.utils import ModelEmaV2
 from train import PreTrainModule, build_data_loader, build_mixup_fn, accuracy
 
 wandb_project = "ImageNet"
@@ -90,7 +90,27 @@ def parse_finetune_args():
     return args
 
 
-model_ema: ModelEmaV2 = None
+class EMA(nn.Module):
+    """ Model Exponential Moving Average V2 from timm"""
+    def __init__(self, model, decay=0.9999):
+        super(EMA, self).__init__()
+        # make a copy of the model for accumulating moving average of weights
+        self.module = deepcopy(model)
+        self.module.eval()
+        self.decay = decay
+
+    def _update(self, model, update_fn):
+        with torch.no_grad():
+            for ema_v, model_v in zip(self.module.state_dict().values(), model.state_dict().values()):
+                ema_v.copy_(update_fn(ema_v, model_v))
+
+    def update(self, model):
+        self._update(model, update_fn=lambda e, m: self.decay * e + (1. - self.decay) * m)
+
+    def set(self, model):
+        self._update(model, update_fn=lambda e, m: m)
+
+model_ema: EMA = None
 
 
 class FinetuneModule(L.LightningModule):
@@ -127,6 +147,7 @@ class FinetuneModule(L.LightningModule):
         images, targets = batch
         if self._mixup_fn is not None:
             mixup_images, mixup_targets = self._mixup_fn(images, targets)
+            # mixup_output = self._model(mixup_images)
             mixup_output = self._model(mixup_images)
             loss = self._train_loss_fn(mixup_output, mixup_targets)
             # with torch.no_grad():
@@ -134,13 +155,14 @@ class FinetuneModule(L.LightningModule):
             # loss_raw = self._eval_loss_fn(output, targets)
             output = mixup_output
         else:
+            # output = self._model(images)
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
             # loss_raw = loss
         # model ema
         global model_ema
         if model_ema is None:
-            model_ema = ModelEmaV2(self._model, decay=self._args.ema_decay)
+            model_ema = EMA(self._model, decay=self._args.ema_decay)
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # log
@@ -160,14 +182,27 @@ class FinetuneModule(L.LightningModule):
         # return
         return loss
 
-    def on_before_zero_grad(self, *args, **kwargs):
+    def optimizer_step(
+        self,
+        epoch,
+        batch_idx,
+        optimizer,
+        optimizer_closure,
+    ):
+        optimizer.step(closure=optimizer_closure)
+        # update ema
         global model_ema
         model_ema.update(self._model)
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         # validation_step defines the validation loop.
-        output = self._model(images)
+        # output = self._model(images)
+        global model_ema
+        if model_ema is not None:
+            output = model_ema.module(images)
+        else:
+            output = self._model(images)
         loss = self._eval_loss_fn(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
