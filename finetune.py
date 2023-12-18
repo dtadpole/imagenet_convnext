@@ -54,8 +54,8 @@ def parse_finetune_args():
                         help='weight decay (default: 1e-8)')
     parser.add_argument('--ema_decay_eval', default=0.9999, type=float,
                         help='eval model ema decay (default: 0.9999)')
-    parser.add_argument('--ema_decay_train', default=0.99, type=float,
-                        help='train model ema decay (default: 0.99)')
+    parser.add_argument('--ema_decay_train', default=0.999, type=float,
+                        help='train model ema decay (default: 0.999)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
