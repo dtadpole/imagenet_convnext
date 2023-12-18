@@ -137,6 +137,10 @@ class FinetuneModule(L.LightningModule):
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
             # loss_raw = loss
+        # model ema
+        global model_ema
+        if model_ema is None:
+            model_ema = ModelEmaV2(self._model, decay=self._args.ema_decay)
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # log
@@ -158,10 +162,7 @@ class FinetuneModule(L.LightningModule):
 
     def on_before_zero_grad(self, *args, **kwargs):
         global model_ema
-        if model_ema is None:
-            model_ema = ModelEmaV2(self._model, decay=self._args.ema_decay)
         model_ema.update(self._model)
-        # pass
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
