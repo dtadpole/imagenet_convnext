@@ -16,8 +16,6 @@ from train import PreTrainModule, build_mixup_fn, accuracy
 
 wandb_project = "ImageNet"
 
-torch.set_float32_matmul_precision('medium')
-
 
 def parse_finetune_args():
     # basic params
@@ -356,6 +354,8 @@ class FinetuneModule(L.LightningModule):
 
 
 if __name__ == '__main__':
+
+    torch.set_float32_matmul_precision('medium')
 
     args = parse_finetune_args()
 

@@ -19,8 +19,6 @@ from flops_profiler.profiler import get_model_profile
 
 wandb_project = "ImageNet"
 
-torch.set_float32_matmul_precision('medium')
-
 
 def parse_pretrain_args():
     # basic params
@@ -387,6 +385,8 @@ class PreTrainModule(L.LightningModule):
 
 
 if __name__ == '__main__':
+
+    torch.set_float32_matmul_precision('medium')
 
     args = parse_pretrain_args()
 
