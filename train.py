@@ -146,6 +146,7 @@ def build_data_loader(args):
         prefetch_factor=args.prefetch,
         persistent_workers=True,
         pin_memory=True)
+
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch_size,
