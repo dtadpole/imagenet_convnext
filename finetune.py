@@ -229,11 +229,23 @@ class FinetuneModule(L.LightningModule):
         # return
         return loss
 
-    def on_train_epoch_end(self):
-        global model_ema_train
-        with torch.no_grad():
-            for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
-                model_v.copy_(ema_v)
+    # def on_train_epoch_end(self):
+    #     global model_ema_train
+    #     if self.trainer.local_rank == 0:
+    #         print(f'on_train_epoch_end')
+    #     with torch.no_grad():
+    #         for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
+    #             model_v.copy_(ema_v)
+
+    # def on_train_batch_end(self, outputs, batch, batch_idx):
+    #     update_steps = math.ceil(2.0 / (1 - self._args.ema_decay_train))
+    #     if (batch_idx + 1) % update_steps == 0:
+    #         if self.trainer.local_rank == 0:
+    #             print(f'on_train_batch_end: [{batch_idx+1:_} / {update_steps:_}]')
+    #         global model_ema_train
+    #         with torch.no_grad():
+    #             for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
+    #                 model_v.copy_(ema_v)
 
     def optimizer_step(
         self,
@@ -246,7 +258,7 @@ class FinetuneModule(L.LightningModule):
         # update ema
         global model_ema_eval, model_ema_train
         model_ema_eval.update(self._model)
-        model_ema_train.update(self._model)
+        # model_ema_train.update(self._model)
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
@@ -335,7 +347,7 @@ class FinetuneModule(L.LightningModule):
         steps_per_epoch = math.ceil(
             dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
-        effective_lr = args.lr * effective_batch_size / 256
+        effective_lr = args.lr * effective_batch_size / 512
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
               f'Effective LR: [{effective_lr:.2e}]')
