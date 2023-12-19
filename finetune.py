@@ -209,7 +209,8 @@ class FinetuneModule(L.LightningModule):
         if model_ema_eval is None:
             model_ema_eval = EMA(self._model, decay=self._args.ema_decay_eval)
         if model_ema_train is None:
-            model_ema_train = EMA(self._model, decay=self._args.ema_decay_train)
+            model_ema_train = EMA(
+                self._model, decay=self._args.ema_decay_train)
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # log
@@ -295,6 +296,9 @@ class FinetuneModule(L.LightningModule):
         train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(
             train_outs) > 0 else val_acc5
         self.train_step_outputs.clear()  # free train memory
+        # return if sanity checking
+        if self.trainer.sanity_checking:
+            return
         # all_gather
         tensorized = torch.Tensor([
             train_loss,
@@ -326,10 +330,6 @@ class FinetuneModule(L.LightningModule):
                 wandb.init(project=wandb_project, name=wandb_name,
                            group="Finetune", config=args)
                 self.wandb_inited = True
-                # print steps, batch size and LR
-                print('-'*80)
-                self._steps_per_epoch()
-                print('-'*80)
             wandb.log(log_dict)
 
     def configure_optimizers(self):
@@ -351,6 +351,7 @@ class FinetuneModule(L.LightningModule):
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
               f'Effective LR: [{effective_lr:.2e}]')
+        print('-'*80)
         return steps_per_epoch, effective_batch_size, effective_lr
 
 

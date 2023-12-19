@@ -35,14 +35,14 @@ def parse_pretrain_args():
                         help="resume checkpoint path (default: None)")
 
     # epoch and lr
-    parser.add_argument('--epoch', default=60, type=int,
-                        help="total epoch (default: 60)")
+    parser.add_argument('--epoch', default=90, type=int,
+                        help="total epoch (default: 90)")
     parser.add_argument('--warmup_epoch', default=5, type=float,
                         help='warmup epoch (default: 5)')
     parser.add_argument('--lr', default=3e-4, type=float,
                         help="learning rate (default: 3e-4)")
-    parser.add_argument('--lr_end', default=1e-6, type=float,
-                        help="ending learning rate (default: 1e-6)")
+    parser.add_argument('--lr_end', default=2e-6, type=float,
+                        help="ending learning rate (default: 2e-6)")
     parser.add_argument('--accumulate_grad', default=4, type=int,
                         help="accumulate gradient (default: 4)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
@@ -217,7 +217,7 @@ class PreTrainModule(L.LightningModule):
         self._profiled = False
 
     def training_step(self, batch, batch_idx):
-        # training_step defines the train loop.
+        # training_step defines the train loop
         images, targets = batch
         if self._mixup_fn is not None:
             mixup_images, mixup_targets = self._mixup_fn(images, targets)
@@ -277,9 +277,11 @@ class PreTrainModule(L.LightningModule):
                     detailed=False,
                     as_string=True,
                 )
+                self._profiled = True
                 print(f'FLOPS: {flops}, MACS: {macs}, PARAMS: {params}')
                 print('-'*80)
-                self._profiled = True
+                # print steps, batch size and LR
+                self._steps_per_epoch()
         # validation_step defines the validation loop.
         output = self._model(images)
         loss = self._eval_loss_fn(output, targets)
@@ -308,6 +310,9 @@ class PreTrainModule(L.LightningModule):
         train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(
             train_outs) > 0 else val_acc5
         self.train_step_outputs.clear()  # free train memory
+        # return if sanity checking
+        if self.trainer.sanity_checking:
+            return
         # all_gather
         tensorized = torch.Tensor([
             train_loss,
@@ -342,10 +347,6 @@ class PreTrainModule(L.LightningModule):
                 wandb.init(project=wandb_project, name=wandb_name,
                            group="PreTrain", config=self._args)
                 self.wandb_inited = True
-                # print steps, batch size and LR
-                print('-'*80)
-                self._steps_per_epoch()
-                print('-'*80)
             wandb.log(log_dict)
 
     def configure_optimizers(self):
@@ -376,11 +377,12 @@ class PreTrainModule(L.LightningModule):
         steps_per_epoch = math.ceil(
             dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
-        effective_lr = args.lr * effective_batch_size / 256
-        effective_lr_end = args.lr_end * effective_batch_size / 256
+        effective_lr = args.lr * effective_batch_size / 512
+        effective_lr_end = args.lr_end * effective_batch_size / 512
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
               f'Effective LR: [{effective_lr:.2e}, {effective_lr_end:.2e}]')
+        print('-'*80)
         return steps_per_epoch, effective_batch_size, effective_lr, effective_lr_end
 
 
