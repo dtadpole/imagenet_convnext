@@ -371,7 +371,7 @@ if __name__ == '__main__':
 
     finetune_module = FinetuneModule(args, train_loader, val_loader)
     if args.compile:
-        model = torch.compile(finetune_module)
+        finetune_module = torch.compile(finetune_module)
 
     checkpoint_callback = ModelCheckpoint(
         save_top_k=3,

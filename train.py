@@ -403,7 +403,7 @@ if __name__ == '__main__':
     pretrain_module = PreTrainModule(args, train_loader, val_loader)
     if args.compile:
         print('Compiling...')
-        model = torch.compile(pretrain_module)
+        pretrain_module = torch.compile(pretrain_module)
         print('Compiled.')
 
     checkpoint_callback = ModelCheckpoint(
