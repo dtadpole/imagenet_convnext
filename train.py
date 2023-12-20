@@ -251,6 +251,10 @@ class PreTrainModule(L.LightningModule):
         # return
         return loss
 
+    def on_train_epoch_end(self):
+        # keeps previous epoch info
+        print()
+
     def optimizer_step(
         self,
         epoch,
@@ -294,8 +298,6 @@ class PreTrainModule(L.LightningModule):
         self.log_dict(log_dict, sync_dist=True)
 
     def on_validation_epoch_end(self):
-        # keeps previous epoch info
-        print()
         # val_outs is a list of whatever stored in `validation_step`
         val_outs = self.validation_step_outputs
         val_loss = torch.stack([x['val_loss'] for x in val_outs]).mean()
