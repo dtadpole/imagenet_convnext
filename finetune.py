@@ -38,6 +38,8 @@ def parse_finetune_args():
                         help="accumulate gradient (default: 1)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
                         help="gradient clipping (default: 1.0)")
+    parser.add_argument('--reference_batch_size', default=512, type=int,
+                        help="reference batch size (default: 512)")
 
     # drop rate
     parser.add_argument('--drop_rate', default=0.1, type=float,
@@ -347,7 +349,7 @@ class FinetuneModule(L.LightningModule):
         steps_per_epoch = math.ceil(
             dataset_size / num_devices / args.accumulate_grad)
         effective_batch_size = args.batch_size * num_devices * args.accumulate_grad
-        effective_lr = args.lr * effective_batch_size / 512
+        effective_lr = args.lr * effective_batch_size / self._args.reference_batch_size
         print(f'Steps per Epoch: [{steps_per_epoch:_}], ',
               f'Effective Batch Size: [{effective_batch_size:_}], ',
               f'Effective LR: [{effective_lr:.2e}]')
