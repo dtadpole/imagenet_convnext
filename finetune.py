@@ -230,6 +230,10 @@ class FinetuneModule(L.LightningModule):
         # return
         return loss
 
+    def on_train_epoch_end(self):
+        # keeps previous epoch info
+        print()
+
     # def on_train_epoch_end(self):
     #     global model_ema_train
     #     if self.trainer.local_rank == 0:
