@@ -266,7 +266,7 @@ class PreTrainModule(L.LightningModule):
         sch = self.lr_schedulers()
         sch.step()
 
-    def on_validation_epoch_start(self):
+    def on_train_epoch_end(self):
         # keeps previous epoch info
         print(" ", end="")
 
