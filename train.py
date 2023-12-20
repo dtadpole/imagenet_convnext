@@ -253,10 +253,6 @@ class PreTrainModule(L.LightningModule):
         # return
         return loss
 
-    def on_train_epoch_end(self):
-        # keeps previous epoch info
-        print()
-
     def optimizer_step(
         self,
         epoch,
@@ -269,6 +265,10 @@ class PreTrainModule(L.LightningModule):
         # step lr scheduler
         sch = self.lr_schedulers()
         sch.step()
+
+    def on_validation_epoch_start(self):
+        # keeps previous epoch info
+        print()
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
