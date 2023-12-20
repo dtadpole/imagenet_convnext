@@ -39,8 +39,8 @@ def parse_pretrain_args():
                         help='warmup epoch (default: 5)')
     parser.add_argument('--lr', default=3e-4, type=float,
                         help="learning rate (default: 3e-4)")
-    parser.add_argument('--lr_end', default=2e-6, type=float,
-                        help="ending learning rate (default: 2e-6)")
+    parser.add_argument('--lr_end', default=1e-6, type=float,
+                        help="ending learning rate (default: 1e-6)")
     parser.add_argument('--accumulate_grad', default=4, type=int,
                         help="accumulate gradient (default: 4)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
