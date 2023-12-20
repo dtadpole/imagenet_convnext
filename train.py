@@ -268,7 +268,7 @@ class PreTrainModule(L.LightningModule):
 
     def on_validation_epoch_start(self):
         # keeps previous epoch info
-        print()
+        print(" ", end="")
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
