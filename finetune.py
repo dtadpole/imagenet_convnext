@@ -232,7 +232,7 @@ class FinetuneModule(L.LightningModule):
 
     def on_train_epoch_end(self):
         # keeps previous epoch info
-        print()
+        print(" ", end="")
 
     # def on_train_epoch_end(self):
     #     global model_ema_train
