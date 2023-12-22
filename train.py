@@ -410,7 +410,7 @@ if __name__ == '__main__':
         save_top_k=3,
         monitor="val_acc1",
         mode="max",
-        filename="model-{epoch:02d}-{val_acc1:.2f}-{val_loss:.2f}")
+        filename="{epoch:02d}-{vacc1:.2f}-{vloss:.2f}")
 
     trainer = L.Trainer(limit_train_batches=None,
                         max_epochs=args.epoch,
