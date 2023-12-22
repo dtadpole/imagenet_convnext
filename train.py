@@ -57,8 +57,8 @@ def parse_pretrain_args():
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=0.1, type=float,
-                        help='weight decay (default: 0.1)')
+    parser.add_argument('--weight_decay', default=0.2, type=float,
+                        help='weight decay (default: 0.2)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
