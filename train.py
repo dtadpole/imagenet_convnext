@@ -41,8 +41,8 @@ def parse_pretrain_args():
                         help="learning rate (default: 3e-4)")
     parser.add_argument('--lr_end', default=1e-6, type=float,
                         help="ending learning rate (default: 1e-6)")
-    parser.add_argument('--accumulate_grad', default=4, type=int,
-                        help="accumulate gradient (default: 4)")
+    parser.add_argument('--accumulate_grad', default=8, type=int,
+                        help="accumulate gradient (default: 8)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
                         help="gradient clipping (default: 1.0)")
     parser.add_argument('--reference_batch_size', default=512, type=int,
@@ -51,14 +51,14 @@ def parse_pretrain_args():
     # drop rate
     parser.add_argument('--drop_rate', default=0.1, type=float,
                         help="drop rate (default: 0.1)")
-    parser.add_argument('--drop_path_rate', default=0.2, type=float,
-                        help="drop path rate (default: 0.2)")
+    parser.add_argument('--drop_path_rate', default=0.3, type=float,
+                        help="drop path rate (default: 0.3)")
     parser.add_argument('--beta1', default=0.9, type=float,
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=0.1, type=float,
-                        help='weight decay (default: 0.1)')
+    parser.add_argument('--weight_decay', default=0.05, type=float,
+                        help='weight decay (default: 0.05)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
