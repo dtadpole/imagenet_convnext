@@ -147,7 +147,7 @@ def build_data_loader(args):
     val_dataset = datasets.ImageFolder(
         os.path.join(args.folder, 'val'),
         transforms.Compose([
-            transforms.Resize(232, interpolation=InterpolationMode.BILINEAR),
+            transforms.Resize(232, interpolation=InterpolationMode.BILINEAR, antialias=True),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
