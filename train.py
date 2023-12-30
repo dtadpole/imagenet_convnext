@@ -135,11 +135,11 @@ def build_data_loader(args):
             #                        magnitude=args.transform_mag),
             # transforms.Resize(256, interpolation=InterpolationMode.BILINEAR),
             # transforms.CenterCrop(224),
-            transforms.RandomResizeCrop(176, interpolation=InterpolationMode.BILINEAR, antialias=True),
-            transforms.v2.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-            transforms.RandomErasing(p=args.random_erase),
+            transforms.RandomResizedCrop(176, interpolation=InterpolationMode.BILINEAR, antialias=True),
+            transforms.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
             transforms.ToTensor(),
+            transforms.RandomErasing(p=args.random_erase),
+            normalize,
         ]))
 
     val_dataset = datasets.ImageFolder(
@@ -147,8 +147,8 @@ def build_data_loader(args):
         transforms.Compose([
             transforms.Resize(232, interpolation=InterpolationMode.BILINEAR),
             transforms.CenterCrop(224),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
             transforms.ToTensor(),
+            normalize,
         ]))
 
     train_loader = DataLoader(
