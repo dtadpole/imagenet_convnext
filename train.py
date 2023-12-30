@@ -7,6 +7,7 @@ from torch import optim, nn, utils, Tensor
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 from torchvision import datasets, transforms
+from torchvision.transforms.functional import InterpolationMode
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
@@ -87,10 +88,12 @@ def parse_pretrain_args():
                         help='Label smoothing (default: 0.1)')
 
     # transforms
-    parser.add_argument('--transform_ops', default=2, type=int,
-                        help='number of ops, default 2')
-    parser.add_argument('--transform_mag', default=15, type=int,
-                        help="magnitude (default: 15)")
+    # parser.add_argument('--transform_ops', default=2, type=int,
+    #                     help='number of ops, default 2')
+    # parser.add_argument('--transform_mag', default=15, type=int,
+    #                     help="magnitude (default: 15)")
+    parser.add_argument('--random_erase', default=0.1, type=float,
+                        help="random erase (default: 0.1)")
     args = parser.parse_args()
     return args
 
@@ -121,22 +124,30 @@ def build_model(args):
 
 
 def build_data_loader(args):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                    std=[0.229, 0.224, 0.225])
+
     # train dataset
     train_dataset = datasets.ImageFolder(
         os.path.join(args.folder, 'train'),
         transforms.Compose([
-            transforms.RandAugment(num_ops=args.transform_ops,
-                                   magnitude=args.transform_mag),
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            # transforms.RandAugment(num_ops=args.transform_ops,
+            #                        magnitude=args.transform_mag),
+            # transforms.Resize(256, interpolation=InterpolationMode.BILINEAR),
+            # transforms.CenterCrop(224),
+            transforms.RandomResizeCrop(176, interpolation=InterpolationMode.BILINEAR, antialias=True),
+            transforms.v2.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            transforms.RandomErasing(p=args.random_erase),
             transforms.ToTensor(),
         ]))
 
     val_dataset = datasets.ImageFolder(
         os.path.join(args.folder, 'val'),
         transforms.Compose([
-            transforms.Resize(256),
+            transforms.Resize(232, interpolation=InterpolationMode.BILINEAR),
             transforms.CenterCrop(224),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
             transforms.ToTensor(),
         ]))
 
