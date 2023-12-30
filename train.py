@@ -94,6 +94,8 @@ def parse_pretrain_args():
     #                     help="magnitude (default: 15)")
     parser.add_argument('--random_erase', default=0.1, type=float,
                         help="random erase (default: 0.1)")
+    parser.add_argument('--train_crop_size', default=176, type=int,
+                        help='train crop size (default 176)')
     args = parser.parse_args()
     return args
 
@@ -135,7 +137,7 @@ def build_data_loader(args):
             #                        magnitude=args.transform_mag),
             # transforms.Resize(256, interpolation=InterpolationMode.BILINEAR),
             # transforms.CenterCrop(224),
-            transforms.RandomResizedCrop(176, interpolation=InterpolationMode.BILINEAR, antialias=True),
+            transforms.RandomResizedCrop(args.train_crop_size, interpolation=InterpolationMode.BILINEAR, antialias=True),
             transforms.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
             transforms.ToTensor(),
             transforms.RandomErasing(p=args.random_erase),
