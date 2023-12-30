@@ -36,8 +36,8 @@ def parse_pretrain_args():
     # epoch and lr
     parser.add_argument('--epoch', default=90, type=int,
                         help="total epoch (default: 90)")
-    parser.add_argument('--warmup_epoch', default=5, type=float,
-                        help='warmup epoch (default: 5)')
+    parser.add_argument('--warmup_epoch', default=10, type=float,
+                        help='warmup epoch (default: 10)')
     parser.add_argument('--lr', default=3e-4, type=float,
                         help="learning rate (default: 3e-4)")
     parser.add_argument('--lr_end', default=1e-6, type=float,
@@ -94,8 +94,8 @@ def parse_pretrain_args():
     #                     help="magnitude (default: 15)")
     parser.add_argument('--random_erase', default=0.1, type=float,
                         help="random erase (default: 0.1)")
-    parser.add_argument('--train_crop_size', default=176, type=int,
-                        help='train crop size (default 176)')
+    parser.add_argument('--train_crop_size', default=192, type=int,
+                        help='train crop size (default 192)')
     args = parser.parse_args()
     return args
 
