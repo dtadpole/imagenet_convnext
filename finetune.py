@@ -265,7 +265,7 @@ class FinetuneModule(L.LightningModule):
             "val_acc5": acc5,
         }
         self.validation_step_outputs.append(log_dict)
-        self.log_dict(log_dict, sync_dist=True)
+        self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
 
     def on_validation_epoch_end(self):
         # keeps previous epoch info
