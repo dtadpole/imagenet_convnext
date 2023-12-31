@@ -10,6 +10,7 @@ import torch.distributed as dist
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import lightning as L
+from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelCheckpoint, DeviceStatsMonitor, LearningRateMonitor, GradientAccumulationScheduler
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 from train import PreTrainModule, EMA, build_mixup_fn, accuracy
@@ -365,6 +366,7 @@ if __name__ == '__main__':
 
     trainer = L.Trainer(limit_train_batches=None,
                         max_epochs=args.epoch,
+                        strategy = DDPStrategy(find_unused_parameters=True),
                         profiler="simple",
                         precision=args.precision,
                         accumulate_grad_batches=args.accumulate_grad,
