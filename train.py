@@ -52,8 +52,8 @@ def parse_pretrain_args():
     # drop rate
     parser.add_argument('--drop_rate', default=0.1, type=float,
                         help="drop rate (default: 0.1)")
-    parser.add_argument('--drop_path_rate', default=0.3, type=float,
-                        help="drop path rate (default: 0.3)")
+    parser.add_argument('--drop_path_rate', default=0.2, type=float,
+                        help="drop path rate (default: 0.2)")
     parser.add_argument('--beta1', default=0.9, type=float,
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
@@ -87,7 +87,7 @@ def parse_pretrain_args():
     parser.add_argument('--smoothing', type=float, default=0.1,
                         help='Label smoothing (default: 0.1)')
 
-    # transforms
+    # transformds
     # parser.add_argument('--transform_ops', default=2, type=int,
     #                     help='number of ops, default 2')
     # parser.add_argument('--transform_mag', default=15, type=int,
