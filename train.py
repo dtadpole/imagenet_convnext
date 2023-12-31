@@ -1,6 +1,7 @@
 import os
 import math
 import argparse
+from copy import deepcopy
 import wandb
 import torch
 from torch import optim, nn, utils, Tensor
@@ -60,6 +61,8 @@ def parse_pretrain_args():
                         help="beta2 (default: 0.999)")
     parser.add_argument('--weight_decay', default=0.1, type=float,
                         help='weight decay (default: 0.1)')
+    parser.add_argument('--model_ema_decay', default=0.9999, type=float,
+                        help='model ema decay (default: 0.9999)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
@@ -204,6 +207,27 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+class EMA(nn.Module):
+    """ Model Exponential Moving Average V2 from timm"""
+
+    def __init__(self, model, decay=0.9999):
+        super(EMA, self).__init__()
+        # make a copy of the model for accumulating moving average of weights
+        self.module = deepcopy(model)
+        self.module.eval()
+        self.decay = decay
+
+    def _update(self, model, update_fn):
+        with torch.no_grad():
+            for ema_v, model_v in zip(self.module.state_dict().values(), model.state_dict().values()):
+                ema_v.copy_(update_fn(ema_v, model_v))
+
+    def update(self, model):
+        self._update(model, update_fn=lambda e,
+                     m: self.decay * e + (1. - self.decay) * m)
+
+    def set(self, model):
+        self._update(model, update_fn=lambda e, m: m)
 
 class PreTrainModule(L.LightningModule):
 
@@ -213,6 +237,7 @@ class PreTrainModule(L.LightningModule):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self._model = build_model(args)
+        self._model_ema = EMA(self._model, decay=self._args.model_ema_decay)
         self._mixup_fn = build_mixup_fn(args)
         if self._mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
@@ -275,6 +300,8 @@ class PreTrainModule(L.LightningModule):
     ):
         # default lightning module
         optimizer.step(closure=optimizer_closure)
+        # update ema model
+        self._model_ema.update(self._model)
         # step lr scheduler
         sch = self.lr_schedulers()
         sch.step()
@@ -301,7 +328,7 @@ class PreTrainModule(L.LightningModule):
                 # print steps, batch size and LR
                 self._steps_per_epoch()
         # validation_step defines the validation loop.
-        output = self._model(images)
+        output = self._model_ema.module(images)
         loss = self._eval_loss_fn(output, targets)
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         log_dict = {
@@ -370,7 +397,9 @@ class PreTrainModule(L.LightningModule):
     def configure_optimizers(self):
         steps_per_epoch, _, effective_lr, effective_lr_end = self._steps_per_epoch()
         optimizer = optim.AdamW(
-            self.parameters(),
+            # self.parameters(),
+            # filter(lambda p: p.requires_grad, self.parameters()),
+            self._model.parameters(),
             lr=effective_lr,
             betas=(args.beta1, args.beta2),
             weight_decay=args.weight_decay)
