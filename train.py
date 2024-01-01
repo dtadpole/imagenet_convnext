@@ -98,8 +98,8 @@ def parse_pretrain_args():
     #                     help="magnitude (default: 15)")
     parser.add_argument('--random_erase', default=0.1, type=float,
                         help="random erase (default: 0.1)")
-    parser.add_argument('--train_crop_size', default=192, type=int,
-                        help='train crop size (default 192)')
+    parser.add_argument('--train_crop_size', default=176, type=int,
+                        help='train crop size (default 176)')
     args = parser.parse_args()
     return args
 
