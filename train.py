@@ -60,8 +60,8 @@ def parse_pretrain_args():
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=1e-6, type=float,
-                        help='weight decay (default: 1e-6)')
+    parser.add_argument('--weight_decay', default=1e-8, type=float,
+                        help='weight decay (default: 1e-8)')
     parser.add_argument('--model_ema_decay', default=0.999, type=float,
                         help='model ema decay (default: 0.999)')
 
