@@ -60,10 +60,10 @@ def parse_pretrain_args():
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=0.1, type=float,
-                        help='weight decay (default: 0.1)')
-    parser.add_argument('--model_ema_decay', default=0.995, type=float,
-                        help='model ema decay (default: 0.995)')
+    parser.add_argument('--weight_decay', default=1e-4, type=float,
+                        help='weight decay (default: 1e-4)')
+    parser.add_argument('--model_ema_decay', default=0.999, type=float,
+                        help='model ema decay (default: 0.999)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
