@@ -60,8 +60,8 @@ def parse_pretrain_args():
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
-    parser.add_argument('--weight_decay', default=1e-8, type=float,
-                        help='weight decay (default: 1e-8)')
+    parser.add_argument('--weight_decay', default=0.1, type=float,
+                        help='weight decay (default: 0.1)')
     parser.add_argument('--model_ema_decay', default=0.999, type=float,
                         help='model ema decay (default: 0.999)')
 
@@ -131,7 +131,7 @@ def build_model(args):
 
 def build_data_loader(args):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
+                                     std=[0.229, 0.224, 0.225])
 
     # train dataset
     train_dataset = datasets.ImageFolder(
@@ -141,8 +141,10 @@ def build_data_loader(args):
             #                        magnitude=args.transform_mag),
             # transforms.Resize(256, interpolation=InterpolationMode.BILINEAR),
             # transforms.CenterCrop(224),
-            transforms.RandomResizedCrop(args.train_crop_size, interpolation=InterpolationMode.BILINEAR, antialias=True),
-            transforms.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
+            transforms.RandomResizedCrop(
+                args.train_crop_size, interpolation=InterpolationMode.BILINEAR, antialias=True),
+            transforms.TrivialAugmentWide(
+                interpolation=InterpolationMode.BILINEAR),
             transforms.ToTensor(),
             transforms.RandomErasing(p=args.random_erase),
             normalize,
@@ -151,7 +153,8 @@ def build_data_loader(args):
     val_dataset = datasets.ImageFolder(
         os.path.join(args.folder, 'val'),
         transforms.Compose([
-            transforms.Resize(232, interpolation=InterpolationMode.BILINEAR, antialias=True),
+            transforms.Resize(
+                232, interpolation=InterpolationMode.BILINEAR, antialias=True),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
@@ -208,6 +211,7 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+
 class EMA(nn.Module):
     """ Model Exponential Moving Average V2 from timm"""
 
@@ -229,6 +233,7 @@ class EMA(nn.Module):
 
     def set(self, model):
         self._update(model, update_fn=lambda e, m: m)
+
 
 class PreTrainModule(L.LightningModule):
 
@@ -457,7 +462,7 @@ if __name__ == '__main__':
 
     trainer = L.Trainer(limit_train_batches=None,
                         max_epochs=args.epoch,
-                        strategy = DDPStrategy(find_unused_parameters=True),
+                        strategy=DDPStrategy(find_unused_parameters=True),
                         profiler="simple",
                         precision=args.precision,
                         accumulate_grad_batches=args.accumulate_grad,
