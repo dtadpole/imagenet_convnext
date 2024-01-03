@@ -380,11 +380,18 @@ class PreTrainModule(L.LightningModule):
                 output = model_.module(images)
             loss = self._eval_loss_fn(output, targets)
             acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-            log_dict = {
-                f"val_loss_{idx}": loss,
-                f"val_acc1_{idx}": acc1,
-                f"val_acc5_{idx}": acc5,
-            }
+            if idx == 0:
+                log_dict = {
+                    f"val_loss": loss,
+                    f"val_acc1": acc1,
+                    f"val_acc5": acc5,
+                }
+            else:
+                log_dict = {
+                    f"val_loss_{idx}": loss,
+                    f"val_acc1_{idx}": acc1,
+                    f"val_acc5_{idx}": acc5,
+                }
             self.validation_step_outputs[idx].append(log_dict)
             self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
 
@@ -404,11 +411,11 @@ class PreTrainModule(L.LightningModule):
             # val_outs is a list of whatever stored in `validation_step`
             val_outs = self.validation_step_outputs[idx]
             val_loss = torch.stack(
-                [x[f'val_loss_{idx}'] for x in val_outs]).mean()
+                [x[f'val_loss_{idx}' if idx != 0 else 'val_loss'] for x in val_outs]).mean()
             val_acc1 = torch.stack(
-                [x[f'val_acc1_{idx}'] for x in val_outs]).mean()
+                [x[f'val_acc1_{idx}' if idx != 0 else 'val_acc1'] for x in val_outs]).mean()
             val_acc5 = torch.stack(
-                [x[f'val_acc5_{idx}'] for x in val_outs]).mean()
+                [x[f'val_acc5_{idx}' if idx != 0 else 'val_acc5'] for x in val_outs]).mean()
             self.validation_step_outputs[idx].clear()  # free val memory
             log_data = log_data + [val_loss, val_acc1, val_acc5]
         # return if sanity checking
@@ -432,11 +439,18 @@ class PreTrainModule(L.LightningModule):
         }
         i = 3
         while (i < len(result_t)):
-            log_dict.update({
-                f"val_loss_{i//3-1}": result_t[i],
-                f"val_acc1_{i//3-1}": result_t[i+1],
-                f"val_acc5_{i//3-1}": result_t[i+2],
-            })
+            if i == 3:
+                log_dict.update({
+                    "val_loss": result_t[i],
+                    "val_acc1": result_t[i+1],
+                    "val_acc5": result_t[i+2],
+                })
+            else:
+                log_dict.update({
+                    f"val_loss_{i//3-1}": result_t[i],
+                    f"val_acc1_{i//3-1}": result_t[i+1],
+                    f"val_acc5_{i//3-1}": result_t[i+2],
+                })
             i += 3
         if idx == 0 and self.trainer.local_rank == 0:
             if not self.wandb_inited:
