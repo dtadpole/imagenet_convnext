@@ -452,7 +452,7 @@ class PreTrainModule(L.LightningModule):
                     f"val_acc5_{i//3-1}": result_t[i+2],
                 })
             i += 3
-        if idx == 0 and self.trainer.local_rank == 0:
+        if self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
                 param_count = sum(p.numel()
