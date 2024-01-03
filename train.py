@@ -54,16 +54,24 @@ def parse_pretrain_args():
     # drop rate
     parser.add_argument('--drop_rate', default=0.1, type=float,
                         help="drop rate (default: 0.1)")
-    parser.add_argument('--drop_path_rate', default=0.2, type=float,
-                        help="drop path rate (default: 0.2)")
+    parser.add_argument('--drop_path_rate', default=0.3, type=float,
+                        help="drop path rate (default: 0.3)")
     parser.add_argument('--beta1', default=0.9, type=float,
                         help="beta1 (default: 0.9)")
     parser.add_argument('--beta2', default=0.999, type=float,
                         help="beta2 (default: 0.999)")
     parser.add_argument('--weight_decay', default=0.1, type=float,
                         help='weight decay (default: 0.1)')
-    parser.add_argument('--model_ema_decay', default=0.999, type=float,
-                        help='model ema decay (default: 0.999)')
+    parser.add_argument('--model_ema_decay_1', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_2', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_3', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_4', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_5', default=None, type=float,
+                        help='model ema decay (default: None)')
 
     # workers
     parser.add_argument('--compile', default=False, type=bool,
@@ -243,12 +251,34 @@ class PreTrainModule(L.LightningModule):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self._model = build_model(args)
-        self._model_ema = EMA(self._model, decay=self._args.model_ema_decay)
+        self._model_emas = nn.ModuleList()
+        self.train_step_outputs = []
+        self.validation_step_outputs = [[]]
+        if self._args.model_ema_decay_1 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_1))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_2 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_2))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_3 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_3))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_4 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_4))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_5 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_5))
+            self.validation_step_outputs.append([])
         self._mixup_fn = build_mixup_fn(args)
         if self._mixup_fn is not None:
             self._train_loss_fn = SoftTargetCrossEntropy()
             self._eval_loss_fn = nn.CrossEntropyLoss()
-        elif args.smoothing > 0.:
+        elif args.smoothing > 0:
             self._train_loss_fn = LabelSmoothingCrossEntropy(
                 smoothing=args.smoothing)
             self._eval_loss_fn = nn.CrossEntropyLoss()
@@ -256,8 +286,6 @@ class PreTrainModule(L.LightningModule):
             self._train_loss_fn = nn.CrossEntropyLoss()
             self._eval_loss_fn = self._train_loss_fn
         self.save_hyperparameters(args)
-        self.train_step_outputs = []
-        self.validation_step_outputs = []
         self.wandb_inited = False
         self._profiled = False
 
@@ -307,7 +335,8 @@ class PreTrainModule(L.LightningModule):
         # default lightning module
         optimizer.step(closure=optimizer_closure)
         # update ema model
-        self._model_ema.update(self._model)
+        for model_ema in self._model_emas:
+            model_ema.update(self._model)
         # step lr scheduler
         sch = self.lr_schedulers()
         sch.step()
@@ -334,45 +363,59 @@ class PreTrainModule(L.LightningModule):
                 # print steps, batch size and LR
                 self._steps_per_epoch()
         # validation_step defines the validation loop.
-        output = self._model_ema.module(images)
-        loss = self._eval_loss_fn(output, targets)
-        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-        log_dict = {
-            "val_loss": loss,
-            "val_acc1": acc1,
-            "val_acc5": acc5,
-        }
-        self.validation_step_outputs.append(log_dict)
-        self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
+        # output = self._model(images)
+        # loss = self._eval_loss_fn(output, targets)
+        # acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+        # log_dict = {
+        #     "val_loss": loss,
+        #     "val_acc1": acc1,
+        #     "val_acc5": acc5,
+        # }
+        # self.validation_step_outputs[0].append(log_dict)
+        # self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
+        for idx, model_ in enumerate([self._model, *self._model_emas]):
+            if idx == 0:
+                output = model_(images)
+            else:
+                output = model_.module(images)
+            loss = self._eval_loss_fn(output, targets)
+            acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+            log_dict = {
+                f"val_loss_{idx}": loss,
+                f"val_acc1_{idx}": acc1,
+                f"val_acc5_{idx}": acc5,
+            }
+            self.validation_step_outputs[idx].append(log_dict)
+            self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
 
     def on_validation_epoch_end(self):
-        # val_outs is a list of whatever stored in `validation_step`
-        val_outs = self.validation_step_outputs
-        val_loss = torch.stack([x['val_loss'] for x in val_outs]).mean()
-        val_acc1 = torch.stack([x['val_acc1'] for x in val_outs]).mean()
-        val_acc5 = torch.stack([x['val_acc5'] for x in val_outs]).mean()
-        self.validation_step_outputs.clear()  # free val memory
         # train_outs is a list of whatever stored in `train_step`
+        log_data = []
         train_outs = self.train_step_outputs
         train_loss = torch.stack([x['train_loss'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_loss
+            train_outs) > 0 else 0
         train_acc1 = torch.stack([x['train_acc1'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_acc1
+            train_outs) > 0 else 0
         train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_acc5
+            train_outs) > 0 else 0
         self.train_step_outputs.clear()  # free train memory
+        log_data = [train_loss, train_acc1, train_acc5]
+        for idx, _ in enumerate([self._model, *self._model_emas]):
+            # val_outs is a list of whatever stored in `validation_step`
+            val_outs = self.validation_step_outputs[idx]
+            val_loss = torch.stack(
+                [x[f'val_loss_{idx}'] for x in val_outs]).mean()
+            val_acc1 = torch.stack(
+                [x[f'val_acc1_{idx}'] for x in val_outs]).mean()
+            val_acc5 = torch.stack(
+                [x[f'val_acc5_{idx}'] for x in val_outs]).mean()
+            self.validation_step_outputs[idx].clear()  # free val memory
+            log_data = [val_loss, val_acc1, val_acc5] + log_data
         # return if sanity checking
         if self.trainer.sanity_checking:
             return
         # all_gather
-        tensorized = torch.Tensor([
-            train_loss,
-            train_acc1,
-            train_acc5,
-            val_loss,
-            val_acc1,
-            val_acc5
-        ]).cuda()
+        tensorized = torch.Tensor(log_data).cuda()
         gather_t = [torch.ones_like(tensorized)
                     for _ in range(dist.get_world_size())]
         dist.all_gather(gather_t, tensorized)
@@ -385,15 +428,21 @@ class PreTrainModule(L.LightningModule):
             "train_loss": result_t[0],
             "train_acc1": result_t[1],
             "train_acc5": result_t[2],
-            "val_loss": result_t[3],
-            "val_acc1": result_t[4],
-            "val_acc5": result_t[5],
             "train_lr": lr,
         }
-        if self.trainer.local_rank == 0:
+        i = 3
+        while (i < len(result_t)):
+            log_dict.update({
+                f"val_loss_{i//3-1}": result_t[i],
+                f"val_acc1_{i//3-1}": result_t[i+1],
+                f"val_acc5_{i//3-1}": result_t[i+2],
+            })
+            i += 3
+        if idx == 0 and self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
-                param_count = sum(p.numel() for p in self._model.parameters())
+                param_count = sum(p.numel()
+                                  for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
                 wandb.init(project=wandb_project, name=wandb_name,
                            group="PreTrain", config=self._args)
