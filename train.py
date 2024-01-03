@@ -180,7 +180,7 @@ def build_data_loader(args):
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=args.workers,
         prefetch_factor=args.prefetch,
         persistent_workers=True,
@@ -410,7 +410,7 @@ class PreTrainModule(L.LightningModule):
             val_acc5 = torch.stack(
                 [x[f'val_acc5_{idx}'] for x in val_outs]).mean()
             self.validation_step_outputs[idx].clear()  # free val memory
-            log_data = [val_loss, val_acc1, val_acc5] + log_data
+            log_data = log_data + [val_loss, val_acc1, val_acc5]
         # return if sanity checking
         if self.trainer.sanity_checking:
             return
