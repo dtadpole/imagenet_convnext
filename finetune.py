@@ -53,8 +53,16 @@ def parse_finetune_args():
                         help="beta2 (default: 0.999)")
     parser.add_argument('--weight_decay', default=1e-8, type=float,
                         help='weight decay (default: 1e-8)')
-    parser.add_argument('--model_ema_decay', default=0.9999, type=float,
-                        help='model ema decay (default: 0.9999)')
+    parser.add_argument('--model_ema_decay_1', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_2', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_3', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_4', default=None, type=float,
+                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_5', default=None, type=float,
+                        help='model ema decay (default: None)')
     # parser.add_argument('--ema_decay_eval', default=0.9999, type=float,
     #                     help='eval model ema decay (default: 0.9999)')
     # parser.add_argument('--ema_decay_train', default=0.999, type=float,
@@ -151,7 +159,29 @@ class FinetuneModule(L.LightningModule):
         checkpoint = PreTrainModule.load_from_checkpoint(
             args.finetune, args=args, train_loader=train_loader, val_loader=val_loader)
         self._model = checkpoint._model
-        self._model_ema = EMA(self._model, decay=self._args.model_ema_decay)
+        self._model_emas = nn.ModuleList()
+        self.train_step_outputs = []
+        self.validation_step_outputs = []
+        if self._args.model_ema_decay_1 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_1))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_2 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_2))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_3 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_3))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_4 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_4))
+            self.validation_step_outputs.append([])
+        if self._args.model_ema_decay_5 is not None:
+            self._model_emas.append(
+                EMA(self._model, decay=self._args.model_ema_decay_5))
+            self.validation_step_outputs.append([])
         # self._train_loss_fn = checkpoint._train_loss_fn
         # self._eval_loss_fn = checkpoint._eval_loss_fn
         if self._mixup_fn is not None:
@@ -165,8 +195,6 @@ class FinetuneModule(L.LightningModule):
             self._train_loss_fn = nn.CrossEntropyLoss()
             self._eval_loss_fn = self._train_loss_fn
         self.save_hyperparameters(args)
-        self.train_step_outputs = []
-        self.validation_step_outputs = []
         self.wandb_inited = False
         self._profiled = False
 
@@ -185,13 +213,6 @@ class FinetuneModule(L.LightningModule):
             output = self._model(images)
             loss = self._train_loss_fn(output, targets)
             # loss_raw = loss
-        # model ema
-        # global model_ema_eval, model_ema_train
-        # if model_ema_eval is None:
-        #     model_ema_eval = EMA(self._model, decay=self._args.ema_decay_eval)
-        # if model_ema_train is None:
-        #     model_ema_train = EMA(
-        #         self._model, decay=self._args.ema_decay_train)
         # accuracy
         acc1, acc5 = accuracy(output, targets, topk=(1, 5))
         # log
@@ -215,24 +236,6 @@ class FinetuneModule(L.LightningModule):
         # keeps previous epoch info
         print(" ", end="")
 
-    # def on_train_epoch_end(self):
-    #     global model_ema_train
-    #     if self.trainer.local_rank == 0:
-    #         print(f'on_train_epoch_end')
-    #     with torch.no_grad():
-    #         for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
-    #             model_v.copy_(ema_v)
-
-    # def on_train_batch_end(self, outputs, batch, batch_idx):
-    #     update_steps = math.ceil(2.0 / (1 - self._args.ema_decay_train))
-    #     if (batch_idx + 1) % update_steps == 0:
-    #         if self.trainer.local_rank == 0:
-    #             print(f'on_train_batch_end: [{batch_idx+1:_} / {update_steps:_}]')
-    #         global model_ema_train
-    #         with torch.no_grad():
-    #             for ema_v, model_v in zip(model_ema_train.module.state_dict().values(), self._model.state_dict().values()):
-    #                 model_v.copy_(ema_v)
-
     def optimizer_step(
         self,
         epoch,
@@ -241,83 +244,101 @@ class FinetuneModule(L.LightningModule):
         optimizer_closure,
     ):
         optimizer.step(closure=optimizer_closure)
-        # update ema
-        # global model_ema_eval, model_ema_train
-        # model_ema_eval.update(self._model)
-        # model_ema_train.update(self._model)
+        # update ema model
+        for model_ema in self._model_emas:
+            model_ema.update(self._model)
         self._model_ema.update(self._model)
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         # validation_step defines the validation loop.
-        # output = self._model(images)
-        # global model_ema_eval
-        # if model_ema_eval is not None:
-        #     output = model_ema_eval.module(images)
-        # else:
-        #     output = self._model(images)
-        output = self._model_ema.module(images)
-        loss = self._eval_loss_fn(output, targets)
-        acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-        log_dict = {
-            "val_loss": loss,
-            "val_acc1": acc1,
-            "val_acc5": acc5,
-        }
-        self.validation_step_outputs.append(log_dict)
-        self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
+        for idx, model_ in enumerate([self._model, *self._model_emas]):
+            if idx == 0:
+                output = model_(images)
+            else:
+                output = model_.module(images)
+            loss = self._eval_loss_fn(output, targets)
+            acc1, acc5 = accuracy(output, targets, topk=(1, 5))
+            if idx == 0:
+                log_dict = {
+                    f"val_loss": loss,
+                    f"val_acc1": acc1,
+                    f"val_acc5": acc5,
+                }
+            else:
+                log_dict = {
+                    f"val_loss_{idx}": loss,
+                    f"val_acc1_{idx}": acc1,
+                    f"val_acc5_{idx}": acc5,
+                }
+            self.validation_step_outputs[idx].append(log_dict)
+            self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
 
     def on_validation_epoch_end(self):
-        # keeps previous epoch info
-        print()
-        # val_outs is a list of whatever stored in `validation_step`
-        val_outs = self.validation_step_outputs
-        val_loss = torch.stack([x['val_loss'] for x in val_outs]).mean()
-        val_acc1 = torch.stack([x['val_acc1'] for x in val_outs]).mean()
-        val_acc5 = torch.stack([x['val_acc5'] for x in val_outs]).mean()
-        self.validation_step_outputs.clear()  # free val memory
         # train_outs is a list of whatever stored in `train_step`
+        log_data = []
         train_outs = self.train_step_outputs
         train_loss = torch.stack([x['train_loss'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_loss
+            train_outs) > 0 else 0
         train_acc1 = torch.stack([x['train_acc1'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_acc1
+            train_outs) > 0 else 0
         train_acc5 = torch.stack([x['train_acc5'] for x in train_outs]).mean() if len(
-            train_outs) > 0 else val_acc5
+            train_outs) > 0 else 0
         self.train_step_outputs.clear()  # free train memory
+        log_data = [train_loss, train_acc1, train_acc5]
+        for idx, _ in enumerate([self._model, *self._model_emas]):
+            # val_outs is a list of whatever stored in `validation_step`
+            val_outs = self.validation_step_outputs[idx]
+            val_loss = torch.stack(
+                [x[f'val_loss_{idx}' if idx != 0 else 'val_loss'] for x in val_outs]).mean()
+            val_acc1 = torch.stack(
+                [x[f'val_acc1_{idx}' if idx != 0 else 'val_acc1'] for x in val_outs]).mean()
+            val_acc5 = torch.stack(
+                [x[f'val_acc5_{idx}' if idx != 0 else 'val_acc5'] for x in val_outs]).mean()
+            self.validation_step_outputs[idx].clear()  # free val memory
+            log_data = log_data + [val_loss, val_acc1, val_acc5]
         # return if sanity checking
         if self.trainer.sanity_checking:
             return
         # all_gather
-        tensorized = torch.Tensor([
-            train_loss,
-            train_acc1,
-            train_acc5,
-            val_loss,
-            val_acc1,
-            val_acc5
-        ]).cuda()
+        tensorized = torch.Tensor(log_data).cuda()
         gather_t = [torch.ones_like(tensorized)
                     for _ in range(dist.get_world_size())]
         dist.all_gather(gather_t, tensorized)
         result_t = torch.mean(torch.stack(gather_t), dim=0)
+        # get lr
+        sch = self.lr_schedulers()
+        lr = sch.get_last_lr()[0]
         # log results
         log_dict = {
             "train_loss": result_t[0],
             "train_acc1": result_t[1],
             "train_acc5": result_t[2],
-            "val_loss": result_t[3],
-            "val_acc1": result_t[4],
-            "val_acc5": result_t[5],
-            "train_lr": args.lr,
+            "train_lr": lr,
         }
+        i = 3
+        while (i < len(result_t)):
+            if i == 3:
+                log_dict.update({
+                    "val_loss": result_t[i],
+                    "val_acc1": result_t[i+1],
+                    "val_acc5": result_t[i+2],
+                })
+            else:
+                log_dict.update({
+                    f"val_loss_{i//3-1}": result_t[i],
+                    f"val_acc1_{i//3-1}": result_t[i+1],
+                    f"val_acc5_{i//3-1}": result_t[i+2],
+                })
+            i += 3
         if self.trainer.local_rank == 0:
             if not self.wandb_inited:
                 model_name = type(self._model).__name__
-                param_count = sum(p.numel() for p in self._model.parameters())
+                param_count = sum(p.numel()
+                                  for p in self._model.parameters())
                 wandb_name = model_name + '__' + f"{param_count:_}"
                 wandb.init(project=wandb_project, name=wandb_name,
-                           group="Finetune", config=args)
+                           group="PreTrain", config=self._args)
                 self.wandb_inited = True
             wandb.log(log_dict)
 
@@ -366,7 +387,7 @@ if __name__ == '__main__':
 
     trainer = L.Trainer(limit_train_batches=None,
                         max_epochs=args.epoch,
-                        strategy = DDPStrategy(find_unused_parameters=True),
+                        strategy=DDPStrategy(find_unused_parameters=True),
                         profiler="simple",
                         precision=args.precision,
                         accumulate_grad_batches=args.accumulate_grad,

@@ -363,16 +363,6 @@ class PreTrainModule(L.LightningModule):
                 # print steps, batch size and LR
                 self._steps_per_epoch()
         # validation_step defines the validation loop.
-        # output = self._model(images)
-        # loss = self._eval_loss_fn(output, targets)
-        # acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-        # log_dict = {
-        #     "val_loss": loss,
-        #     "val_acc1": acc1,
-        #     "val_acc5": acc5,
-        # }
-        # self.validation_step_outputs[0].append(log_dict)
-        # self.log_dict(log_dict, sync_dist=True, rank_zero_only=False)
         for idx, model_ in enumerate([self._model, *self._model_emas]):
             if idx == 0:
                 output = model_(images)
