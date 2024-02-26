@@ -44,8 +44,8 @@ def parse_pretrain_args():
                         help="learning rate (default: 3e-4)")
     parser.add_argument('--lr_end', default=1e-6, type=float,
                         help="ending learning rate (default: 1e-6)")
-    parser.add_argument('--accumulate_grad', default=8, type=int,
-                        help="accumulate gradient (default: 8)")
+    parser.add_argument('--accumulate_grad', default=4, type=int,
+                        help="accumulate gradient (default: 4)")
     parser.add_argument('--gradient_clipping', default=1.0, type=float,
                         help="gradient clipping (default: 1.0)")
     parser.add_argument('--reference_batch_size', default=512, type=int,
@@ -62,8 +62,8 @@ def parse_pretrain_args():
                         help="beta2 (default: 0.999)")
     parser.add_argument('--weight_decay', default=0.1, type=float,
                         help='weight decay (default: 0.1)')
-    parser.add_argument('--model_ema_decay_1', default=None, type=float,
-                        help='model ema decay (default: None)')
+    parser.add_argument('--model_ema_decay_1', default=0.998, type=float,
+                        help='model ema decay (default: 0.998)')
     parser.add_argument('--model_ema_decay_2', default=None, type=float,
                         help='model ema decay (default: None)')
     parser.add_argument('--model_ema_decay_3', default=None, type=float,
@@ -78,10 +78,10 @@ def parse_pretrain_args():
                         help="compile model (default: False)")
     parser.add_argument('--precision', default='bf16-mixed', type=str,
                         help='training precision (default: bf16-mixed)')
-    parser.add_argument('--workers', default=10, type=int,
-                        help="number of workers (default: 10)")
-    parser.add_argument('--prefetch', default=5, type=int,
-                        help="number of prefetch (default: 5)")
+    parser.add_argument('--workers', default=15, type=int,
+                        help="number of workers (default: 15)")
+    parser.add_argument('--prefetch', default=4, type=int,
+                        help="number of prefetch (default: 4)")
 
     # Mixup params
     parser.add_argument('--mixup', type=float, default=0.8,
